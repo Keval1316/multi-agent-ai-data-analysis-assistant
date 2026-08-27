@@ -140,6 +140,36 @@ class MockLLMProvider(LLMProvider):
                 recommended_charts=charts
             )  # type: ignore
 
+        # 3. SQLGenerationResponse
+        from backend.app.models.sql import SQLGenerationResponse, GeneratedSQLQuery
+        if response_model == SQLGenerationResponse:
+            cols = re.findall(r"['\"]([a-zA-Z0-9_]+)['\"]", prompt_text)
+            numeric_cols = [c for c in cols if any(k in c.lower() for k in ["revenue", "price", "quantity", "cost", "score", "rate", "amount"])]
+            cat_cols = [c for c in cols if any(k in c.lower() for k in ["region", "category", "product", "status", "country", "segment", "type"])]
+
+            # Extract table name if present
+            table_match = re.search(r"table\s+['\"]?([a-zA-Z0-9_]+)['\"]?", prompt_text, re.IGNORECASE)
+            tbl = table_match.group(1) if table_match else "dataset"
+
+            num1 = numeric_cols[0] if numeric_cols else "total_revenue"
+            cat1 = cat_cols[0] if cat_cols else "region"
+
+            queries = [
+                GeneratedSQLQuery(
+                    name=f"top_{cat1}_by_{num1}",
+                    purpose=f"Aggregate total {num1} grouped by {cat1} in descending order",
+                    sql=f"SELECT {cat1}, SUM({num1}) AS total_{num1}, COUNT(*) AS transaction_count FROM {tbl} GROUP BY {cat1} ORDER BY total_{num1} DESC LIMIT 10",
+                    expected_columns=[cat1, f"total_{num1}", "transaction_count"]
+                ),
+                GeneratedSQLQuery(
+                    name="overall_dataset_summary",
+                    purpose=f"Compute overall average, min, and max for {num1}",
+                    sql=f"SELECT COUNT(*) AS total_records, AVG({num1}) AS avg_{num1}, MIN({num1}) AS min_{num1}, MAX({num1}) AS max_{num1} FROM {tbl}",
+                    expected_columns=["total_records", f"avg_{num1}", f"min_{num1}", f"max_{num1}"]
+                )
+            ]
+            return SQLGenerationResponse(queries=queries)  # type: ignore
+
         # Generic fallback using response model defaults or empty construction
         try:
             return response_model()

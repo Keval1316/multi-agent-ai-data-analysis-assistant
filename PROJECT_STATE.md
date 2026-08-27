@@ -1,17 +1,17 @@
 # PROJECT STATE
 
-Last updated: 2026-08-27 11:45
+Last updated: 2026-08-27 11:59
 
 ## Current Phase
-Phase 4: Statistical and SQL analysis (Next)
+Phase 6: Insight generation and critic loop (Next)
 
 ## Completed Phases
 - [x] Phase 0: Repository scaffolding
 - [x] Phase 1: File upload and ingestion
 - [x] Phase 2: Dataset profiling and quality checking
 - [x] Phase 3: LLM router and dataset understanding
-- [ ] Phase 4: Statistical and SQL analysis
-- [ ] Phase 5: Pattern detection and visualizations
+- [x] Phase 4: Statistical and SQL analysis
+- [x] Phase 5: Pattern detection and visualizations
 - [ ] Phase 6: Insight generation and critic loop
 - [ ] Phase 7: Report generation and PDF export
 - [ ] Phase 8: Full LangGraph orchestration and SSE
@@ -20,16 +20,14 @@ Phase 4: Statistical and SQL analysis (Next)
 - [ ] Phase 11: Deployment and documentation
 
 ## Key Decisions and Notes
-- **Resilient Multi-Provider LLM Abstraction**:
-  - Abstract base `LLMProvider` implemented by `GroqProvider` (`groq`), `GeminiProvider` (`google-genai`), and `MockLLMProvider`.
-  - Central `LLMRouter` maintains credential pools (`GROQ_API_KEY_1..3`, `GEMINI_API_KEY_1..2`), tracks health/cooldowns (60s on 429/quota error), automatically fails over across providers, and enforces Pydantic structured output validation.
-  - `DataPrivacyFilter` automatically detects and redacts emails, phone numbers, SSNs, credit card numbers, and secret tokens before prompts leave the system.
-- **Dataset Understanding & Analysis Planning**:
-  - `DatasetUnderstandingAgent` takes compact structural summaries and quality scores to infer business domain, target entity, candidate KPIs, and strategic questions.
-  - `AnalysisPlanningAgent` builds executable analysis plans with strict post-validation against real existing dataset columns, dropping or replacing any hallucinated column names.
+- **Pattern & Anomaly Detection**:
+  - `PatternDetector` executes deterministic linear regression trends (`slope`, `r_squared`, growth rates, p-values), Pareto concentration analysis (measuring category dominance), z-score / IQR multi-metric anomaly detection, and day-of-week seasonality cycles.
+- **Interactive Visualization Engine**:
+  - `ChartGenerator` produces rich, interactive Plotly JSON specs (bar, line, scatter, donut) styled with the exact requested color palette (`#EDF1D6`, `#40513B`, `#609966`, `#9DC08B`, `#FFFFFF`).
+  - `ChartRenderer` provides responsive client-side rendering with tooltips and interactive hover states.
 
 ## Known Issues / Limitations
-- None in Phase 3.
+- None in Phase 5.
 
 ## Environment Variables Required
 - `APP_ENV`: Application environment (development/production) [Backend]
@@ -44,22 +42,20 @@ Phase 4: Statistical and SQL analysis (Next)
 - `VITE_API_BASE_URL`: Base backend URL (http://localhost:8000) [Frontend]
 
 ## Test Status
-- Backend test suite (`backend/tests/`): 26 passed in 5.85s (`test_health.py`, `test_ingestion.py`, `test_profiling.py`, `test_quality.py`, `test_llm_router.py`, `test_agents.py`).
-- Frontend production bundle (`npm run build`): Clean build in 9.07s.
+- Backend test suite (`backend/tests/`): 39 passed in 2.63s (`test_health.py`, `test_ingestion.py`, `test_profiling.py`, `test_quality.py`, `test_llm_router.py`, `test_agents.py`, `test_statistics.py`, `test_sql_safety.py`, `test_sql_execution.py`, `test_patterns.py`, `test_visualizations.py`).
+- Frontend production bundle (`npm run build`): Clean build in 2.55s.
 
 ## Next Phase Plan
-- **Phase 4: Statistical and SQL Analysis**
-  - Implement deterministic statistical analysis engine (`backend/app/services/statistics/engine.py`):
-    * Group-by aggregations (sum, mean, median, min, max, count)
-    * Growth rates, distributions, and quantiles
-    * Correlation matrix computation (Pearson / Spearman)
-    * Hypothesis tests / ANOVA or Chi-Square where statistically appropriate
-  - Implement SQL Generation Agent (`backend/app/agents/generate_sql.py`):
-    * Generates safe DuckDB SQL queries based on validated Analysis Plan
-  - Implement SQL Safety Validator (`backend/app/services/sql/validator.py`):
-    * Validates read-only AST / syntax (permits SELECT, WITH/CTE)
-    * Strictly rejects mutating or dangerous keywords: `INSERT`, `UPDATE`, `DELETE`, `DROP`, `ALTER`, `CREATE`, `COPY`, `ATTACH`, `DETACH`, `INSTALL`, `LOAD`, `PRAGMA`, `IMPORT`, `EXPORT`
-    * Verifies referenced table and column names
-  - Implement SQL Execution Service (`backend/app/services/sql/executor.py`):
-    * Executes queries safely against DuckDB in-memory tables and formats structured result tables
-  - Add comprehensive unit tests for safe SQL execution and rejecting dangerous SQL injections.
+- **Phase 6: Insight Generation and Critic Loop**
+  - Implement Insight Generation Agent (`backend/app/agents/generate_insights.py`):
+    * Generates evidence-grounded findings referencing only computed statistics, SQL results, and patterns
+    * Avoids causal claims without proof ("is associated with", "may indicate", "suggests")
+    * Pydantic model `InsightCollection` (`InsightItem`: finding, supporting_evidence, importance, confidence, recommendation)
+  - Implement Critic Review Agent (`backend/app/agents/critic_review.py`):
+    * Audits generated insights against ground-truth statistical numbers and SQL tables
+    * Detects hallucinated numbers, unsupported claims, overstated causation
+    * Pydantic model `CriticReviewResult` (approved: bool, feedback, unsupported_claims, required_corrections)
+  - Implement Insight Revision Loop (`backend/app/agents/revise_insights.py`):
+    * Condition-based revision with a strict cap of maximum 2 revision loops
+    * Preserves supported insights and attaches internal/user caveats if revision limit reached
+  - Add comprehensive unit and mock tests for supported, unsupported, and revision loop handling.
