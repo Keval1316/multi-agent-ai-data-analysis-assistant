@@ -97,30 +97,45 @@ export default function DataQualityTab({ report }) {
           </div>
 
           <div className="space-y-3">
-            {quality.issues.map((issue) => (
-              <div
-                key={issue.id}
-                className="p-4 md:p-5 rounded-2xl bg-white/80 border border-[#CEAB93]/40 flex flex-col sm:flex-row sm:items-start justify-between gap-3.5 text-xs shadow-sm hover:border-[#AD8B73] transition-colors"
-              >
-                <div className="space-y-1.5 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-extrabold text-sm text-[#3E2723]">{issue.issue_type.replace('_', ' ').toUpperCase()}</span>
-                    {issue.column_name && (
-                      <span className="font-mono text-[11px] font-bold px-2 py-0.5 rounded-lg bg-[#FFFBE9] border border-[#CEAB93]/60 text-[#3E2723]">
-                        Variable: {issue.column_name}
-                      </span>
+            {quality.issues.map((issue, idx) => {
+              const issueTitle =
+                issue.title ||
+                (issue.category || issue.issue_type || 'Data Quality Finding')
+                  .toString()
+                  .replace(/_/g, ' ')
+                  .toUpperCase();
+              const action = issue.suggested_action || issue.recommendation;
+
+              return (
+                <div
+                  key={issue.id || `issue-${idx}`}
+                  className="p-4 md:p-5 rounded-2xl bg-white/80 border border-[#CEAB93]/40 flex flex-col sm:flex-row sm:items-start justify-between gap-3.5 text-xs shadow-sm hover:border-[#AD8B73] transition-colors"
+                >
+                  <div className="space-y-1.5 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-extrabold text-sm text-[#3E2723]">{issueTitle}</span>
+                      {issue.category && (
+                        <span className="font-mono text-[10px] font-bold uppercase px-2 py-0.5 rounded-md bg-[#AD8B73]/15 text-[#3E2723] border border-[#CEAB93]/60">
+                          {issue.category.replace(/_/g, ' ')}
+                        </span>
+                      )}
+                      {issue.column_name && (
+                        <span className="font-mono text-[11px] font-bold px-2 py-0.5 rounded-lg bg-[#FFFBE9] border border-[#CEAB93]/60 text-[#3E2723]">
+                          Variable: {issue.column_name}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[#7D5A44] leading-relaxed font-normal">{issue.description}</p>
+                    {action && (
+                      <div className="text-[#3E2723] font-semibold mt-1 bg-[#AD8B73]/10 p-2.5 rounded-xl border border-[#CEAB93]/40">
+                        Suggested Action: {action}
+                      </div>
                     )}
                   </div>
-                  <p className="text-[#7D5A44] leading-relaxed font-normal">{issue.description}</p>
-                  {issue.recommendation && (
-                    <div className="text-[#3E2723] font-semibold mt-1 bg-[#AD8B73]/10 p-2.5 rounded-xl border border-[#CEAB93]/40">
-                      Recommendation: {issue.recommendation}
-                    </div>
-                  )}
+                  <div>{getSeverityBadge(issue.severity)}</div>
                 </div>
-                <div>{getSeverityBadge(issue.severity)}</div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
@@ -155,14 +170,14 @@ export default function DataQualityTab({ report }) {
                     <td className="py-3 px-4 font-bold text-[#3E2723] font-mono">{col.name}</td>
                     <td className="py-3 px-4">
                       <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono bg-[#AD8B73]/15 text-[#3E2723] border border-[#CEAB93]/60 font-bold">
-                        {col.semantic_type}
+                        {col.semantic_type || 'unclassified'}
                       </span>
                     </td>
                     <td className="py-3 px-4 text-[#7D5A44] font-mono text-[11px]">{col.dtype}</td>
                     <td className="py-3 px-4 text-[#7D5A44] font-mono">{col.null_percentage}%</td>
-                    <td className="py-3 px-4 text-[#3E2723] font-mono font-semibold">{col.unique_count.toLocaleString()}</td>
+                    <td className="py-3 px-4 text-[#3E2723] font-mono font-semibold">{col.unique_count?.toLocaleString() ?? 0}</td>
                     <td className="py-3 px-4 text-[#7D5A44] font-mono text-[11px] truncate max-w-xs">
-                      {col.sample_values.slice(0, 3).join(', ') || '—'}
+                      {(col.sample_values || []).slice(0, 3).join(', ') || '—'}
                     </td>
                   </tr>
                 ))}
