@@ -27,7 +27,9 @@ class DataCleaner:
     """
 
     NULL_PLACEHOLDERS = {
-        "n/a", "na", "null", "none", "nan", "nil", "-", "--", "", " ", "unknown", "invalid_date", "undefined"
+        "n/a", "na", "null", "none", "nan", "nil", "-", "--", "---", "", " ",
+        "unknown", "invalid_date", "undefined", "missing", "?", "???",
+        "#n/a", "#ref!", "#value!", "#num!", "#name?", "#div/0!"
     }
 
     @classmethod

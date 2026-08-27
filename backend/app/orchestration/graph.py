@@ -9,6 +9,7 @@ from backend.app.services.ingestion.loader import DatasetLoader
 from backend.app.services.ingestion.duckdb_manager import duckdb_manager
 from backend.app.services.profiling.profiler import DatasetProfiler
 from backend.app.services.quality.checker import QualityChecker
+from backend.app.services.cleaning.cleaner import DataCleaner
 from backend.app.agents.understand_dataset import DatasetUnderstandingAgent
 from backend.app.agents.plan_analysis import AnalysisPlanningAgent
 from backend.app.services.statistics.engine import StatisticalEngine
@@ -27,7 +28,7 @@ from backend.app.services.reporting.report_builder import ReportBuilder
 # --- NODE DEFINITIONS ---
 
 def validate_file_node(state: AnalysisWorkflowState) -> Dict[str, Any]:
-    logger.info("[Node 1: validate_file] Validating file input")
+    logger.info("[Node 1: validate_file] Validating file input & metadata")
     filename = state.get("filename", "dataset.csv")
     file_bytes = state.get("file_bytes")
     if file_bytes is None:
@@ -45,17 +46,20 @@ def validate_file_node(state: AnalysisWorkflowState) -> Dict[str, Any]:
 
 
 def load_dataset_node(state: AnalysisWorkflowState) -> Dict[str, Any]:
-    logger.info("[Node 2: load_dataset] Parsing dataset and registering in DuckDB")
+    logger.info("[Node 2: load_dataset] Parsing raw dataset and registering in DuckDB")
     file_bytes = state["file_bytes"]
     ext = state["file_extension"]
     dataset_id = state.get("dataset_id") or str(uuid.uuid4())
 
     df, metadata = DatasetLoader.load_and_sanitize(file_bytes, ext)
-    registered_id, table_name = duckdb_manager.register_dataframe(df, dataset_id)
+    raw_table = f"raw_{duckdb_manager.generate_table_name(dataset_id)}"
+    duckdb_manager.register_dataframe(df, dataset_id, raw_table)
 
     return {
-        "dataset_id": registered_id,
-        "table_name": table_name,
+        "dataset_id": dataset_id,
+        "table_name": raw_table,
+        "raw_table_name": raw_table,
+        "raw_df": df,
         "df": df,
         "current_step": "load_dataset",
         "step_index": 2,
@@ -64,7 +68,7 @@ def load_dataset_node(state: AnalysisWorkflowState) -> Dict[str, Any]:
 
 
 def profile_and_audit_node(state: AnalysisWorkflowState) -> Dict[str, Any]:
-    logger.info("[Node 3: profile_and_audit] Profiling schema and auditing quality")
+    logger.info("[Node 3: profile_and_audit] Profiling schema and auditing data quality on raw table")
     df = state["df"]
     dataset_id = state["dataset_id"]
     table_name = state["table_name"]
@@ -81,8 +85,38 @@ def profile_and_audit_node(state: AnalysisWorkflowState) -> Dict[str, Any]:
     }
 
 
+def clean_and_standardize_node(state: AnalysisWorkflowState) -> Dict[str, Any]:
+    logger.info("[Node 4: clean_and_standardize] Sanitizing, imputing & standardizing dataset")
+    raw_df = state.get("raw_df") if state.get("raw_df") is not None else state["df"]
+    dataset_id = state["dataset_id"]
+    filename = state.get("filename", "dataset.csv")
+
+    # Clean dataset
+    cleaned_df, cleaning_summary = DataCleaner.clean_dataset(raw_df, dataset_id, filename)
+    ReportBuilder.cache_cleaned_df(dataset_id, cleaned_df)
+
+    # Register cleaned table in DuckDB for all downstream analytical queries
+    clean_table = duckdb_manager.generate_table_name(dataset_id)
+    duckdb_manager.register_dataframe(cleaned_df, dataset_id, clean_table)
+
+    # Update profile to reflect sanitized data types and non-null values
+    cleaned_profile = DatasetProfiler.profile_dataset(cleaned_df, dataset_id, clean_table)
+
+    return {
+        "df": cleaned_df,
+        "cleaned_df": cleaned_df,
+        "table_name": clean_table,
+        "cleaned_table_name": clean_table,
+        "cleaning_summary": cleaning_summary.model_dump(),
+        "profile": cleaned_profile,
+        "current_step": "clean_and_standardize",
+        "step_index": 4,
+        "status_label": STEP_METADATA["clean_and_standardize"]["label"]
+    }
+
+
 def understand_dataset_node(state: AnalysisWorkflowState) -> Dict[str, Any]:
-    logger.info("[Node 4: understand_dataset] Inferring domain and KPI candidates")
+    logger.info("[Node 5: understand_dataset] Inferring domain, entities & analytical intent")
     profile = state["profile"]
     quality = state["quality"]
     filename = state.get("filename", "dataset.csv")
@@ -91,13 +125,13 @@ def understand_dataset_node(state: AnalysisWorkflowState) -> Dict[str, Any]:
     return {
         "understanding": understanding,
         "current_step": "understand_dataset",
-        "step_index": 4,
+        "step_index": 5,
         "status_label": STEP_METADATA["understand_dataset"]["label"]
     }
 
 
 def plan_analysis_node(state: AnalysisWorkflowState) -> Dict[str, Any]:
-    logger.info("[Node 5: plan_analysis] Formulating validated analysis plan")
+    logger.info("[Node 6: plan_analysis] Formulating adaptive execution plan")
     profile = state["profile"]
     understanding = state["understanding"]
 
@@ -105,13 +139,13 @@ def plan_analysis_node(state: AnalysisWorkflowState) -> Dict[str, Any]:
     return {
         "plan": plan,
         "current_step": "plan_analysis",
-        "step_index": 5,
+        "step_index": 6,
         "status_label": STEP_METADATA["plan_analysis"]["label"]
     }
 
 
 def run_statistical_analysis_node(state: AnalysisWorkflowState) -> Dict[str, Any]:
-    logger.info("[Node 6: run_statistical_analysis] Computing moments and correlations")
+    logger.info("[Node 7: run_statistical_analysis] Computing distributions, moments & correlations")
     df = state["df"]
     profile = state["profile"]
     plan = state["plan"]
@@ -120,13 +154,13 @@ def run_statistical_analysis_node(state: AnalysisWorkflowState) -> Dict[str, Any
     return {
         "statistics": statistics,
         "current_step": "run_statistical_analysis",
-        "step_index": 6,
+        "step_index": 7,
         "status_label": STEP_METADATA["run_statistical_analysis"]["label"]
     }
 
 
 def generate_sql_node(state: AnalysisWorkflowState) -> Dict[str, Any]:
-    logger.info("[Node 7: generate_sql] Generating analytical DuckDB SQL queries")
+    logger.info("[Node 8: generate_sql] Generating analytical DuckDB SQL queries")
     profile = state["profile"]
     plan = state["plan"]
     table_name = state["table_name"]
@@ -135,13 +169,13 @@ def generate_sql_node(state: AnalysisWorkflowState) -> Dict[str, Any]:
     return {
         "sql_queries": queries,
         "current_step": "generate_sql",
-        "step_index": 7,
+        "step_index": 8,
         "status_label": STEP_METADATA["generate_sql"]["label"]
     }
 
 
 def validate_sql_node(state: AnalysisWorkflowState) -> Dict[str, Any]:
-    logger.info("[Node 8: validate_sql] Validating SQL queries for safety")
+    logger.info("[Node 9: validate_sql] Verifying SQL syntax & AST security guards")
     queries = state["sql_queries"]
     table_name = state["table_name"]
 
@@ -157,13 +191,13 @@ def validate_sql_node(state: AnalysisWorkflowState) -> Dict[str, Any]:
     return {
         "validated_sql_queries": validated_queries,
         "current_step": "validate_sql",
-        "step_index": 8,
+        "step_index": 9,
         "status_label": STEP_METADATA["validate_sql"]["label"]
     }
 
 
 def execute_sql_node(state: AnalysisWorkflowState) -> Dict[str, Any]:
-    logger.info("[Node 9: execute_sql] Executing validated queries against DuckDB")
+    logger.info("[Node 10: execute_sql] Executing validated queries against DuckDB")
     queries = state.get("validated_sql_queries") or state.get("sql_queries", [])
     dataset_id = state["dataset_id"]
     table_name = state["table_name"]
@@ -172,13 +206,13 @@ def execute_sql_node(state: AnalysisWorkflowState) -> Dict[str, Any]:
     return {
         "sql_results": sql_results,
         "current_step": "execute_sql",
-        "step_index": 9,
+        "step_index": 10,
         "status_label": STEP_METADATA["execute_sql"]["label"]
     }
 
 
 def detect_patterns_node(state: AnalysisWorkflowState) -> Dict[str, Any]:
-    logger.info("[Node 10: detect_patterns] Discovering trends and Pareto concentrations")
+    logger.info("[Node 11: detect_patterns] Discovering trends, Pareto shares & anomalies")
     df = state["df"]
     profile = state["profile"]
 
@@ -186,22 +220,13 @@ def detect_patterns_node(state: AnalysisWorkflowState) -> Dict[str, Any]:
     return {
         "patterns": patterns,
         "current_step": "detect_patterns",
-        "step_index": 10,
+        "step_index": 11,
         "status_label": STEP_METADATA["detect_patterns"]["label"]
     }
 
 
-def select_visualizations_node(state: AnalysisWorkflowState) -> Dict[str, Any]:
-    logger.info("[Node 11: select_visualizations] Selecting visualization layout")
-    return {
-        "current_step": "select_visualizations",
-        "step_index": 11,
-        "status_label": STEP_METADATA["select_visualizations"]["label"]
-    }
-
-
 def render_charts_node(state: AnalysisWorkflowState) -> Dict[str, Any]:
-    logger.info("[Node 12: render_charts] Generating interactive Plotly charts")
+    logger.info("[Node 12: render_charts] Compiling domain-adaptive interactive Plotly visuals")
     df = state["df"]
     profile = state["profile"]
     plan = state["plan"]
@@ -216,7 +241,7 @@ def render_charts_node(state: AnalysisWorkflowState) -> Dict[str, Any]:
 
 
 def generate_insights_node(state: AnalysisWorkflowState) -> Dict[str, Any]:
-    logger.info("[Node 13: generate_insights] Generating evidence-grounded insights")
+    logger.info("[Node 13: generate_insights] Deriving strict 4-part evidence-grounded insights")
     understanding = state["understanding"]
     statistics = state["statistics"]
     sql_results = state["sql_results"]
@@ -241,7 +266,7 @@ def generate_insights_node(state: AnalysisWorkflowState) -> Dict[str, Any]:
 
 
 def critic_review_node(state: AnalysisWorkflowState) -> Dict[str, Any]:
-    logger.info("[Node 14: critic_review] Auditing insights against ground truth")
+    logger.info("[Node 14: critic_review] Auditing insights against ground-truth evidence")
     insights = state["insights"]
     statistics = state["statistics"]
     sql_results = state["sql_results"]
@@ -263,7 +288,7 @@ def critic_review_node(state: AnalysisWorkflowState) -> Dict[str, Any]:
 
 
 def revise_insights_node(state: AnalysisWorkflowState) -> Dict[str, Any]:
-    logger.info("[Node 15: revise_insights] Checking critic review status")
+    logger.info("[Node 15: revise_insights] Evaluating critic review status")
     approved = state.get("critic_approved", True)
     rev_cnt = state.get("revision_count", 0)
     review = state.get("critic_review")
@@ -288,7 +313,6 @@ def revise_insights_node(state: AnalysisWorkflowState) -> Dict[str, Any]:
             "status_label": STEP_METADATA["revise_insights"]["label"]
         }
     else:
-        # Proceed to report generation
         return {
             "critic_approved": True,
             "current_step": "revise_insights",
@@ -305,7 +329,7 @@ def should_continue_revision(state: AnalysisWorkflowState) -> Literal["generate_
 
 
 def generate_report_node(state: AnalysisWorkflowState) -> Dict[str, Any]:
-    logger.info("[Node 16: generate_report] Compiling final analysis report")
+    logger.info("[Node 16: generate_report] Compiling comprehensive executive report")
     report = ReportGenerationAgent.generate(
         understanding=state["understanding"],
         profile=state["profile"],
@@ -315,6 +339,7 @@ def generate_report_node(state: AnalysisWorkflowState) -> Dict[str, Any]:
         patterns=state["patterns"],
         charts=state["charts"],
         insights=state["insights"],
+        cleaning_summary=state.get("cleaning_summary"),
         filename=state.get("filename", "dataset.csv")
     )
     return {
@@ -328,15 +353,11 @@ def generate_report_node(state: AnalysisWorkflowState) -> Dict[str, Any]:
 def render_pdf_node(state: AnalysisWorkflowState) -> Dict[str, Any]:
     logger.info("[Node 17: render_pdf] Rendering downloadable PDF and caching report")
     report = state["report"]
-    df = state.get("df")
+    cleaned_df = state.get("cleaned_df") if state.get("cleaned_df") is not None else state.get("df")
     dataset_id = state.get("dataset_id") or report.dataset_id
-    filename = state.get("filename", "dataset.csv")
 
-    if df is not None:
-        from backend.app.services.cleaning.cleaner import DataCleaner
-        cleaned_df, cleaning_summary = DataCleaner.clean_dataset(df, dataset_id, filename)
+    if cleaned_df is not None:
         ReportBuilder.cache_cleaned_df(dataset_id, cleaned_df)
-        report.cleaning_summary = cleaning_summary.model_dump()
 
     pdf_bytes = PDFExporter.generate_pdf(report)
     ReportBuilder.cache_report(report)
@@ -355,10 +376,11 @@ def build_analysis_graph() -> StateGraph:
     """Builds and compiles the full 17-node LangGraph StateGraph."""
     graph = StateGraph(AnalysisWorkflowState)
 
-    # Add all 17 nodes
+    # Add all 17 nodes in strict logical sequence
     graph.add_node("validate_file", validate_file_node)
     graph.add_node("load_dataset", load_dataset_node)
     graph.add_node("profile_and_audit", profile_and_audit_node)
+    graph.add_node("clean_and_standardize", clean_and_standardize_node)
     graph.add_node("understand_dataset", understand_dataset_node)
     graph.add_node("plan_analysis", plan_analysis_node)
     graph.add_node("run_statistical_analysis", run_statistical_analysis_node)
@@ -366,7 +388,6 @@ def build_analysis_graph() -> StateGraph:
     graph.add_node("validate_sql", validate_sql_node)
     graph.add_node("execute_sql", execute_sql_node)
     graph.add_node("detect_patterns", detect_patterns_node)
-    graph.add_node("select_visualizations", select_visualizations_node)
     graph.add_node("render_charts", render_charts_node)
     graph.add_node("generate_insights", generate_insights_node)
     graph.add_node("critic_review", critic_review_node)
@@ -378,15 +399,15 @@ def build_analysis_graph() -> StateGraph:
     graph.add_edge(START, "validate_file")
     graph.add_edge("validate_file", "load_dataset")
     graph.add_edge("load_dataset", "profile_and_audit")
-    graph.add_edge("profile_and_audit", "understand_dataset")
+    graph.add_edge("profile_and_audit", "clean_and_standardize")
+    graph.add_edge("clean_and_standardize", "understand_dataset")
     graph.add_edge("understand_dataset", "plan_analysis")
     graph.add_edge("plan_analysis", "run_statistical_analysis")
     graph.add_edge("run_statistical_analysis", "generate_sql")
     graph.add_edge("generate_sql", "validate_sql")
     graph.add_edge("validate_sql", "execute_sql")
     graph.add_edge("execute_sql", "detect_patterns")
-    graph.add_edge("detect_patterns", "select_visualizations")
-    graph.add_edge("select_visualizations", "render_charts")
+    graph.add_edge("detect_patterns", "render_charts")
     graph.add_edge("render_charts", "generate_insights")
     graph.add_edge("generate_insights", "critic_review")
     graph.add_edge("critic_review", "revise_insights")

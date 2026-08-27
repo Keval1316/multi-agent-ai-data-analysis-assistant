@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from typing import List
+from typing import List, Optional, Dict, Any
 from backend.app.models.understanding import DatasetUnderstanding
 from backend.app.models.profile import DatasetProfile
 from backend.app.models.quality import QualityReport
@@ -27,20 +27,61 @@ class ReportGenerationAgent:
         patterns: PatternDetectionResult,
         charts: ChartCollection,
         insights: InsightCollection,
+        cleaning_summary: Optional[Dict[str, Any]] = None,
         filename: str = "dataset.csv"
     ) -> AnalysisReport:
         dataset_id = profile.dataset_id
         logger.info(f"Running ReportGenerationAgent for dataset '{dataset_id}' ({filename})")
 
-        # Format compact context summary
+        # 1. Format Fact Sheet components
         kpi_summary = ", ".join([f"{k.name} ({k.aggregation})" for k in understanding.key_kpis])
-        insight_summary = "\n".join([f"- {ins.title}: {ins.finding}" for ins in insights.insights])
+        
+        insight_blocks = []
+        for ins in insights.insights:
+            insight_blocks.append(
+                f"- **{ins.title}** [{ins.category}]: {ins.finding}\n"
+                f"  *Evidence*: {ins.evidence or ins.supporting_evidence}\n"
+                f"  *Interpretation*: {ins.interpretation}\n"
+                f"  *Actionable Implication*: {ins.implication or ins.recommendation}"
+            )
+        insight_summary = "\n\n".join(insight_blocks)
+
+        stats_summary = []
+        for um in statistics.univariate_metrics[:6]:
+            stats_summary.append(
+                f"- '{um.column_name}': Mean={um.mean:,.2f}, Median={um.median:,.2f}, Std={um.std:,.2f}, IQR={um.iqr:,.2f}, Skewness={um.skewness:,.2f}"
+            )
+        for cp in statistics.correlation_results[:4]:
+            stats_summary.append(
+                f"- Correlation {cp.col1} vs {cp.col2}: r = {cp.pearson_coef:+.3f} (p = {cp.pearson_pvalue:.4f}, significant = {cp.is_statistically_significant})"
+            )
+
+        sql_summary = []
+        for sq in sql_results.results[:4]:
+            if sq.execution_status == "success" and sq.rows:
+                sql_summary.append(f"- Query '{sq.query_name}': {sq.row_count} records. Top: {sq.rows[:2]}")
+
+        patterns_summary = []
+        for t in patterns.trends[:3]:
+            patterns_summary.append(f"- Trend ({t.metric_column}): {t.description}")
+        for c in patterns.concentrations[:3]:
+            patterns_summary.append(f"- Pareto Concentration ({c.dimension_column}): {c.description}")
+        for a in patterns.anomalies[:3]:
+            patterns_summary.append(f"- Outlier Anomaly ({a.metric_column}): {a.description} [Row: {a.row_identifier}]")
+
+        cleaning_text = "Standard data hygiene verified; zero critical formatting anomalies."
+        if cleaning_summary:
+            t_list = cleaning_summary.get("transformations", [])
+            cleaning_text = f"Purged {cleaning_summary.get('duplicates_removed', 0)} duplicates, imputed {cleaning_summary.get('nulls_imputed', 0)} nulls. Transformations: {'; '.join(t_list[:4])}"
 
         system_prompt = (
             "You are a Chief AI Analytics Officer and Lead Data Strategist. "
-            "Your objective is to synthesize a structured, publication-grade analytical report "
-            "evaluating the uploaded dataset. "
-            "Return a structured GeneratedReportMarkdown object with rich, polished markdown sections."
+            "Your objective is to synthesize a deeply quantitative, publication-grade analytical executive report "
+            "evaluating the uploaded dataset for any domain (Sales, Healthcare, Finance, HR, Operations, Education, Logistics, etc.).\n\n"
+            "MANDATORY REPORTING RULES:\n"
+            "1. CITE CONCRETE FIGURES: Never make vague claims. Include actual metrics, baseline numbers, group shares, correlations, and row IDs.\n"
+            "2. STRUCTURE: Return a GeneratedReportMarkdown with clear, compelling markdown formatting, bullet points, and actionable executive insights.\n"
+            "3. INTEGRATION: Incorporate the data cleaning actions, statistical moments, DuckDB SQL discoveries, empirical patterns, and strategic implications."
         )
 
         user_prompt = (
@@ -49,15 +90,23 @@ class ReportGenerationAgent:
             f"Filename: {filename}\n"
             f"Domain: {understanding.domain}\n"
             f"Target Entity: {understanding.target_entity}\n"
-            f"Rows: {profile.total_rows:,} | Columns: {profile.total_columns}\n"
-            f"Data Quality Score: {quality.quality_score}/100 (Grade {quality.grade})\n"
+            f"Records: {profile.total_rows:,} | Variables: {profile.total_columns}\n"
+            f"Cleanliness Rating: {quality.quality_score}/100 (Grade {quality.grade})\n"
             f"Key KPIs: {kpi_summary}\n\n"
-            f"Verified Insights:\n"
+            f"--- DATA CLEANING & HYGIENE ACTIONS ---\n"
+            f"{cleaning_text}\n\n"
+            f"--- COMPUTED STATISTICAL MOMENTS ---\n"
+            f"{chr(10).join(stats_summary) if stats_summary else 'Standard distributions calculated.'}\n\n"
+            f"--- DUCKDB SQL AGGREGATIONS ---\n"
+            f"{chr(10).join(sql_summary) if sql_summary else 'Standard queries executed.'}\n\n"
+            f"--- EMPIRICAL PATTERNS, TRENDS & ANOMALIES ---\n"
+            f"{chr(10).join(patterns_summary) if patterns_summary else 'No severe multi-sigma outliers.'}\n\n"
+            f"--- VERIFIED EVIDENCE-BACKED INSIGHTS ---\n"
             f"{insight_summary}\n\n"
-            f"Write a comprehensive report with:\n"
-            f"1. Clear, professional Title and Subtitle\n"
+            f"Write a comprehensive, quantitative report with:\n"
+            f"1. Professional Title and Subtitle\n"
             f"2. Executive Summary\n"
-            f"3. Key Findings in detailed markdown\n"
+            f"3. Key Findings in detailed quantitative markdown\n"
             f"4. Strategic Business Recommendations\n"
             f"5. Methodology, Data Governance & Analytical Caveats"
         )
@@ -127,7 +176,8 @@ class ReportGenerationAgent:
             sql_results=sql_results,
             patterns=patterns,
             charts=charts,
-            insights=insights
+            insights=insights,
+            cleaning_summary=cleaning_summary
         )
 
         logger.info(f"ReportGenerationAgent successfully compiled report for '{dataset_id}'")

@@ -178,43 +178,55 @@ class MockLLMProvider(LLMProvider):
             if id_match:
                 dataset_id = id_match.group(1)
 
+            # Extract numbers/metrics from prompt if present
+            stat_matches = re.findall(r"- Metric '([^']+)': Mean=([\d,\.]+), Median=([\d,\.]+)", prompt_text)
+            corr_matches = re.findall(r"- Correlation '([^']+)' vs '([^']+)': Pearson r=([+-]?[\d\.]+)", prompt_text)
+            group_matches = re.findall(r"- GroupBy '([^']+)' by '([^']+)'.*?: ([^,\n]+)", prompt_text)
+
+            m1_name, m1_mean, m1_med = stat_matches[0] if stat_matches else ("Value Metric", "1,250.00", "980.00")
+            c1_name, c2_name, c_val = corr_matches[0] if corr_matches else ("Primary Metric", "Secondary Metric", "+0.72")
+            g_dim, g_met, g_top = group_matches[0] if group_matches else ("Category", "Volume", "Top Segment (45.2%)")
+
             insights = [
                 InsightItem(
                     id="ins_1",
-                    title="Category Revenue Concentration",
-                    finding="Commercial performance is heavily concentrated in top product lines, with leading categories generating the majority of overall revenue volume.",
-                    supporting_evidence="Top category represents the largest single segment share according to computed group aggregations.",
+                    title=f"Segment Performance & {g_dim} Concentration",
+                    finding=f"Operational metrics demonstrate pronounced concentration across {g_dim}, with leading segments dominating overall volume.",
+                    evidence=f"Top segment distribution in {g_dim}: {g_top}. Group aggregation confirms statistically significant variance across segments.",
+                    interpretation=f"The dataset reveals that high-performing {g_dim} segments drive the vast majority of {g_met}, creating concentrated exposure.",
+                    implication=f"Focus strategic resource allocation and operational monitoring on top-performing {g_dim} groups while developing targeted growth initiatives for secondary segments.",
+                    category="Growth Driver",
                     importance="High",
-                    confidence="High",
-                    recommendation="Focus inventory allocation and promotional campaigns on high-performing product segments.",
-                    category="Revenue Driver"
+                    confidence="High"
                 ),
                 InsightItem(
                     id="ins_2",
-                    title="Volume and Pricing Distribution",
-                    finding="Transaction sizes indicate a steady baseline of routine purchases alongside high-value premium orders.",
-                    supporting_evidence="Univariate statistics show mean revenue exceeds the median, reflecting an upward-skewed transaction distribution.",
+                    title=f"Distribution Skewness in {m1_name}",
+                    finding=f"Statistical analysis of '{m1_name}' indicates an asymmetric distribution where mean values diverge from the median baseline.",
+                    evidence=f"Computed parametric moments for '{m1_name}': Mean = {m1_mean}, Median = {m1_med}. Skewness reflects an extended right-tail distribution.",
+                    interpretation=f"A standard average significantly overstates baseline typical performance; median figures ({m1_med}) provide a more robust operational benchmark.",
+                    implication=f"Adopt median-based KPI targets rather than simple arithmetic means to prevent high-value outliers from distorting performance targets.",
+                    category="Performance",
                     importance="Medium",
-                    confidence="High",
-                    recommendation="Implement tiered loyalty incentives to encourage upselling on baseline orders.",
-                    category="Performance"
+                    confidence="High"
                 ),
                 InsightItem(
                     id="ins_3",
-                    title="Outlier and Operational Integrity",
-                    finding="Identified isolated anomalies that deviate significantly from standard transaction parameters.",
-                    supporting_evidence="Statistical Z-scores and IQR detection flagged values outside standard boundaries.",
-                    importance="Medium",
-                    confidence="Medium",
-                    recommendation="Establish automated validation rules to flag extreme transaction values at point of entry.",
-                    category="Operational Risk"
+                    title=f"Empirical Association: {c1_name} vs {c2_name}",
+                    finding=f"Detected a strong, statistically significant correlation between '{c1_name}' and '{c2_name}'.",
+                    evidence=f"Pearson correlation coefficient r = {c_val} (statistically significant at p < 0.05). Verified across all cleaned dataset rows.",
+                    interpretation=f"Movement in '{c1_name}' consistently tracks variations in '{c2_name}', indicating an underlying operational linkage.",
+                    implication=f"Leverage '{c1_name}' as a leading indicator to forecast and optimize '{c2_name}' resource planning.",
+                    category="Performance",
+                    importance="High",
+                    confidence="High"
                 )
             ]
 
             summary_points = [
-                "Strong concentration in core product categories driving top-line revenue.",
-                "Right-skewed order value distribution with significant premium order opportunities.",
-                "Targeted operational audits recommended for extreme outlier transactions."
+                f"Significant concentration across leading {g_dim} segments driving primary {g_met} volume.",
+                f"Distribution skewness in {m1_name} (Mean={m1_mean} vs Median={m1_med}) necessitates median-based benchmarking.",
+                f"Statistically significant correlation (r = {c_val}) identified between {c1_name} and {c2_name}."
             ]
 
             return InsightCollection(

@@ -27,7 +27,12 @@ class DuckDBManager:
         clean_id = re.sub(r"[^a-zA-Z0-9_]", "_", dataset_id)
         return f"dataset_{clean_id}"
 
-    def register_dataframe(self, df: pd.DataFrame, dataset_id: Optional[str] = None) -> Tuple[str, str]:
+    def register_dataframe(
+        self,
+        df: pd.DataFrame,
+        dataset_id: Optional[str] = None,
+        table_name: Optional[str] = None
+    ) -> Tuple[str, str]:
         """
         Registers a pandas DataFrame into DuckDB.
         Returns (dataset_id, table_name).
@@ -36,7 +41,8 @@ class DuckDBManager:
             if not dataset_id:
                 dataset_id = str(uuid.uuid4())
 
-            table_name = self.generate_table_name(dataset_id)
+            if not table_name:
+                table_name = self.generate_table_name(dataset_id)
             
             # Register in DuckDB
             # DuckDB allows creating table directly from DataFrame

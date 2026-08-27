@@ -30,14 +30,14 @@ class InsightGenerationAgent:
         stats_evidence = []
         for um in statistics.univariate_metrics:
             stats_evidence.append(
-                f"- Metric '{um.column_name}': Mean={um.mean:,.2f}, Median={um.median:,.2f}, Min={um.min:,.2f}, Max={um.max:,.2f}, Std={um.std:,.2f}, IQR={um.iqr:,.2f}"
+                f"- Metric '{um.column_name}': Mean={um.mean:,.2f}, Median={um.median:,.2f}, Min={um.min:,.2f}, Max={um.max:,.2f}, Std={um.std:,.2f}, IQR={um.iqr:,.2f}, Skewness={um.skewness:,.2f}"
             )
         for cp in statistics.correlation_results:
             stats_evidence.append(
-                f"- Correlation '{cp.col1}' vs '{cp.col2}': Pearson={cp.pearson_coef} (p={cp.pearson_pvalue}), Strength={cp.strength}"
+                f"- Correlation '{cp.col1}' vs '{cp.col2}': Pearson r={cp.pearson_coef:+.3f} (p-value={cp.pearson_pvalue:.4f}), Statistically Significant={cp.is_statistically_significant}, Strength={cp.strength}"
             )
         for gr in statistics.groupby_results:
-            top_items = [f"{it.group_value}: {it.sum or it.mean:,.2f} ({it.share_percentage}%)" for it in gr.items[:4]]
+            top_items = [f"{it.group_value}: {it.sum or it.mean:,.2f} ({it.share_percentage:.1f}%)" for it in gr.items[:5]]
             stats_evidence.append(
                 f"- GroupBy '{gr.group_column}' by '{gr.metric_column}' ({gr.aggregation}): {', '.join(top_items)}"
             )
@@ -46,30 +46,37 @@ class InsightGenerationAgent:
         sql_evidence = []
         for sq in sql_results.results:
             if sq.execution_status == "success" and sq.rows:
+                top_rows_str = ", ".join([str(r) for r in sq.rows[:3]])
                 sql_evidence.append(
-                    f"- Query '{sq.query_name}' ({sq.purpose}): {sq.row_count} rows returned. Sample top row: {json.dumps(sq.rows[0])}"
+                    f"- Query '{sq.query_name}' ({sq.purpose}): {sq.row_count} rows. Top results: [{top_rows_str}]"
                 )
 
         # 3. Summarize Pattern results
         pattern_evidence = []
         for t in patterns.trends:
-            pattern_evidence.append(f"- Trend: {t.description}")
+            pattern_evidence.append(f"- Trend ({t.metric_column}): {t.description}")
         for c in patterns.concentrations:
-            pattern_evidence.append(f"- Concentration: {c.description}")
+            pattern_evidence.append(f"- Concentration ({c.dimension_column}): {c.description} (Share: {c.top_categories_share_pct:.1f}%)")
         for a in patterns.anomalies:
-            pattern_evidence.append(f"- Anomaly: {a.description}")
+            pattern_evidence.append(f"- Anomaly ({a.metric_column}): {a.description} [Severity: {a.severity}]")
         for s in patterns.seasonality:
-            pattern_evidence.append(f"- Seasonality: {s.description}")
+            pattern_evidence.append(f"- Seasonality ({s.metric_column}): {s.description}")
 
         system_prompt = (
-            "You are a Principal AI Data Strategist. "
-            "Your objective is to generate 3 to 6 high-impact, evidence-grounded business insights. "
-            "CRITICAL EVIDENCE GROUNDING RULES:\n"
-            "1. Every single finding MUST be strictly grounded in the provided computed statistics, SQL results, or patterns.\n"
-            "2. Cite the exact figures in the 'supporting_evidence' field.\n"
-            "3. DO NOT assert causality unless statistically proven (use 'is associated with', 'suggests', 'may indicate').\n"
-            "4. NEVER fabricate numbers or invent metrics that are not in the evidence.\n"
-            "5. Provide actionable, realistic business recommendations for each finding."
+            "You are a Lead Quantitative AI Data Strategist and Senior Quantitative Auditor. "
+            "Your objective is to generate 3 to 6 high-impact, deeply quantitative insights for any dataset domain "
+            "(Sales, Finance, Healthcare, HR, Operations, Education, Logistics, Customer, etc.).\n\n"
+            "MANDATORY 4-PART INSIGHT STRUCTURE:\n"
+            "For every insight, you MUST populate:\n"
+            "1. 'finding': Direct analytical finding stating exactly what occurred.\n"
+            "2. 'evidence': The EXACT numbers, percentages, baseline figures, p-values, or query rows from the computed data.\n"
+            "3. 'interpretation': The operational or domain meaning of these numbers.\n"
+            "4. 'implication': Concrete, actionable recommendation or strategic next step for decision-makers.\n\n"
+            "STRICT GROUNDING RULES:\n"
+            "- NEVER use generic phrases like 'significant growth', 'certain categories', or 'outliers were found' without citing the exact category names, periods, and figures.\n"
+            "- Every figure cited in 'evidence' must match the computed evidence tables.\n"
+            "- DO NOT assert causality unless statistically proven (use 'is correlated with', 'is associated with', 'suggests').\n"
+            "- Return a structured InsightCollection."
         )
 
         critique_block = ""
@@ -85,15 +92,16 @@ class InsightGenerationAgent:
             f"Dataset ID: {dataset_id}\n"
             f"Domain: {understanding.domain}\n"
             f"Summary: {understanding.dataset_summary}\n"
-            f"Quality Rating: {quality.quality_score}/100 (Grade {quality.grade})\n\n"
-            f"Computed Statistical Evidence:\n"
-            f"{chr(10).join(stats_evidence[:10])}\n\n"
-            f"Executed SQL Query Evidence:\n"
-            f"{chr(10).join(sql_evidence[:6])}\n\n"
-            f"Detected Pattern Evidence:\n"
-            f"{chr(10).join(pattern_evidence[:8])}"
+            f"Target Entity: {understanding.target_entity}\n"
+            f"Data Quality Score: {quality.quality_score}/100 (Grade {quality.grade})\n\n"
+            f"--- COMPUTED STATISTICAL EVIDENCE ---\n"
+            f"{chr(10).join(stats_evidence[:12]) if stats_evidence else 'Standard variance moments computed.'}\n\n"
+            f"--- EXECUTED DUCKDB SQL QUERY EVIDENCE ---\n"
+            f"{chr(10).join(sql_evidence[:8]) if sql_evidence else 'Standard analytical aggregations executed.'}\n\n"
+            f"--- DETECTED PATTERNS, TRENDS & ANOMALIES ---\n"
+            f"{chr(10).join(pattern_evidence[:8]) if pattern_evidence else 'No extreme multi-sigma outliers detected.'}"
             f"{critique_block}\n\n"
-            f"Generate an InsightCollection containing structured insights and executive takeaways."
+            f"Generate an InsightCollection with 3 to 6 evidence-grounded insights strictly adhering to the 4-part structure."
         )
 
         messages = [

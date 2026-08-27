@@ -362,14 +362,35 @@ ORD-2010,Hank Green,electronics,Mouse,2,25.00,0,50.00,2025-01-10,False,West`;
       {/* 1. Header Navigation */}
       <header className="sticky top-0 z-40 bg-white/85 backdrop-blur-xl border-b border-[#CEAB93]/40 shadow-sm transition-all">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
-          <div className="flex items-center space-x-3.5">
+          {/* Left: Brand Identity */}
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 md:w-11 md:h-11 rounded-2xl bg-gradient-to-br from-[#AD8B73] to-[#3E2723] text-white flex items-center justify-center shadow-md shadow-[#AD8B73]/20 ring-2 ring-white/80">
+              <Bot className="w-5 h-5 md:w-6 md:h-6" />
+            </div>
+            <div>
+              <div className="flex items-center space-x-2">
+                <span className="font-extrabold text-base md:text-lg tracking-tight text-[#3E2723] font-display">
+                  Multi-Agent Data Analyst
+                </span>
+                <span className="hidden sm:inline px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-[#AD8B73]/15 text-[#3E2723] border border-[#CEAB93]/50">
+                  v1.0
+                </span>
+              </div>
+              <span className="text-[11px] md:text-xs text-[#7D5A44] font-medium tracking-wide block">
+                Autonomous CSV & Excel Insight Synthesizer
+              </span>
+            </div>
+          </div>
+
+          {/* Right: History, New Analysis & Status */}
+          <div className="flex items-center space-x-2.5">
             <button
               onClick={() => setIsSidebarOpen(true)}
-              className="p-2.5 rounded-2xl bg-white/90 border border-[#CEAB93]/50 text-[#3E2723] hover:border-[#AD8B73] hover:bg-[#FFFBE9] transition-all shadow-xs flex items-center space-x-2 cursor-pointer group"
+              className="p-2 sm:px-3.5 sm:py-2 rounded-2xl bg-white/90 border border-[#CEAB93]/60 text-[#3E2723] hover:border-[#AD8B73] hover:bg-[#FFFBE9] transition-all shadow-xs flex items-center space-x-2 cursor-pointer group"
               title="Open Analysis History"
             >
               <HistoryIcon className="w-4 h-4 text-[#AD8B73] group-hover:scale-110 transition-transform" />
-              <span className="hidden md:inline text-xs font-bold font-sans">History</span>
+              <span className="text-xs font-bold font-sans">History</span>
               {history.length > 0 && (
                 <span className="px-1.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-[#AD8B73]/15 text-[#3E2723] border border-[#CEAB93]/40">
                   {history.length}
@@ -377,27 +398,6 @@ ORD-2010,Hank Green,electronics,Mouse,2,25.00,0,50.00,2025-01-10,False,West`;
               )}
             </button>
 
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 md:w-11 md:h-11 rounded-2xl bg-gradient-to-br from-[#AD8B73] to-[#3E2723] text-white flex items-center justify-center shadow-md shadow-[#AD8B73]/20 ring-2 ring-white/80">
-                <Bot className="w-5 h-5 md:w-6 md:h-6" />
-              </div>
-              <div>
-                <div className="flex items-center space-x-2">
-                  <span className="font-extrabold text-base md:text-lg tracking-tight text-[#3E2723] font-display">
-                    Multi-Agent Data Analyst
-                  </span>
-                  <span className="hidden sm:inline px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-[#AD8B73]/15 text-[#3E2723] border border-[#CEAB93]/50">
-                    v1.0
-                  </span>
-                </div>
-                <span className="text-[11px] md:text-xs text-[#7D5A44] font-medium tracking-wide block">
-                  Autonomous CSV & Excel Insight Synthesizer
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex items-center space-x-2.5">
             {stage === 'dashboard' && (
               <button
                 onClick={handleReset}
@@ -407,6 +407,7 @@ ORD-2010,Hank Green,electronics,Mouse,2,25.00,0,50.00,2025-01-10,False,West`;
                 <span className="hidden sm:inline">New Analysis</span>
               </button>
             )}
+
             <div className="hidden sm:flex items-center space-x-1.5 px-3 py-1.5 rounded-full bg-[#AD8B73]/10 border border-[#CEAB93]/50 text-[#3E2723] text-xs font-mono font-semibold">
               <span className="w-2 h-2 rounded-full bg-[#AD8B73] animate-pulse" />
               <span>17 Agents</span>

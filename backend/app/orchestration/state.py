@@ -19,7 +19,13 @@ class AnalysisWorkflowState(TypedDict, total=False):
     file_bytes: Optional[bytes]
     file_extension: str
     table_name: str
+    raw_table_name: str
+    cleaned_table_name: str
     df: Optional[pd.DataFrame]
+    raw_df: Optional[pd.DataFrame]
+    cleaned_df: Optional[pd.DataFrame]
+    cleaning_summary: Optional[Dict[str, Any]]
+    fact_sheet: Optional[Dict[str, Any]]
 
     # Pipeline Artifacts
     profile: Optional[DatasetProfile]

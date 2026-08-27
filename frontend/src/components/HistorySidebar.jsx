@@ -64,13 +64,13 @@ export default function HistorySidebar({
             className="fixed inset-0 bg-[#3E2723]/30 backdrop-blur-xs z-50 transition-opacity"
           />
 
-          {/* Sidebar Drawer */}
+          {/* Sidebar Drawer - Slide from Right */}
           <motion.aside
-            initial={{ x: '-100%' }}
+            initial={{ x: '100%' }}
             animate={{ x: 0 }}
-            exit={{ x: '-100%' }}
+            exit={{ x: '100%' }}
             transition={{ type: 'spring', damping: 26, stiffness: 280 }}
-            className="fixed top-0 left-0 bottom-0 w-full max-w-[360px] sm:max-w-[400px] bg-[#FFFBE9]/95 backdrop-blur-2xl border-r border-[#CEAB93]/60 shadow-2xl z-50 flex flex-col font-sans"
+            className="fixed top-0 right-0 bottom-0 w-full max-w-[360px] sm:max-w-[400px] bg-[#FFFBE9]/95 backdrop-blur-2xl border-l border-[#CEAB93]/60 shadow-2xl z-50 flex flex-col font-sans"
           >
             {/* 1. Sidebar Header */}
             <div className="p-5 border-b border-[#CEAB93]/40 flex items-center justify-between bg-white/60">

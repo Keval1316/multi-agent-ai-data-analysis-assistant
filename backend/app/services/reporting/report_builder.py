@@ -90,26 +90,34 @@ class ReportBuilder:
     ) -> AnalysisReport:
         logger.info(f"Building complete analysis report for dataset '{dataset_id}' ({filename})")
 
-        # 1. Profile & Quality
-        profile = DatasetProfiler.profile_dataset(df, dataset_id, table_name)
-        quality = QualityChecker.audit_dataset(df, profile)
+        # 1. Profile & Quality on raw input
+        raw_profile = DatasetProfiler.profile_dataset(df, dataset_id, table_name)
+        quality = QualityChecker.audit_dataset(df, raw_profile)
 
-        # 2. Understanding & Planning
+        # 2. Early Data Cleaning & Sanitization
+        cleaned_df, cleaning_summary = DataCleaner.clean_dataset(df, dataset_id, filename)
+        cls.cache_cleaned_df(dataset_id, cleaned_df)
+
+        # Re-register cleaned table in DuckDB and re-profile
+        duckdb_manager.register_dataframe(cleaned_df, dataset_id, table_name)
+        profile = DatasetProfiler.profile_dataset(cleaned_df, dataset_id, table_name)
+
+        # 3. Understanding & Planning
         understanding = DatasetUnderstandingAgent.analyze(profile, quality, filename)
         plan = AnalysisPlanningAgent.plan(profile, understanding)
 
-        # 3. Statistical Analysis
-        statistics = StatisticalEngine.run_analysis(df, profile, plan)
+        # 4. Statistical Analysis on Cleaned Data
+        statistics = StatisticalEngine.run_analysis(cleaned_df, profile, plan)
 
-        # 4. SQL Generation & Execution
+        # 5. SQL Generation & Execution against Cleaned Table
         queries = SQLGenerationAgent.generate(profile, plan, table_name)
         sql_results = SQLExecutor.execute_queries(queries, dataset_id, table_name)
 
-        # 5. Pattern Detection & Charts
-        patterns = PatternDetector.detect_all(df, profile)
-        charts = ChartGenerator.generate_all(df, profile, plan)
+        # 6. Pattern Detection & Visualizations
+        patterns = PatternDetector.detect_all(cleaned_df, profile)
+        charts = ChartGenerator.generate_all(cleaned_df, profile, plan)
 
-        # 6. Insight Generation & Critic Loop
+        # 7. Insight Generation & Adversarial Critic Loop
         insights, critic_review, rev_cnt = InsightRevisionOrchestrator.run_generation_and_critic_loop(
             understanding=understanding,
             statistics=statistics,
@@ -118,7 +126,7 @@ class ReportBuilder:
             quality=quality
         )
 
-        # 7. Compile Full Report
+        # 8. Compile Comprehensive Report
         report = ReportGenerationAgent.generate(
             understanding=understanding,
             profile=profile,
@@ -128,13 +136,9 @@ class ReportBuilder:
             patterns=patterns,
             charts=charts,
             insights=insights,
+            cleaning_summary=cleaning_summary.model_dump(),
             filename=filename
         )
-
-        # 8. Deterministic Data Cleaning & Sanitization
-        cleaned_df, cleaning_summary = DataCleaner.clean_dataset(df, dataset_id, filename)
-        cls.cache_cleaned_df(dataset_id, cleaned_df)
-        report.cleaning_summary = cleaning_summary.model_dump()
 
         # Cache report
         cls.cache_report(report)
