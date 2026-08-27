@@ -6,7 +6,9 @@ import {
   Copy,
   Check,
   Loader2,
-  AlertTriangle
+  AlertTriangle,
+  FileCheck2,
+  Sparkles
 } from 'lucide-react';
 
 export default function ReportMarkdownTab({ report, datasetId }) {
@@ -55,44 +57,48 @@ export default function ReportMarkdownTab({ report, datasetId }) {
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 8 }}
+      initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3 }}
       className="space-y-6"
     >
       {/* Action Bar */}
-      <div className="p-6 rounded-3xl bg-surface border border-border shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h3 className="font-bold text-text-primary text-base">
-            Executive Report Document
-          </h3>
-          <p className="text-xs text-text-secondary">
+      <div className="glass-card p-6 md:p-8 rounded-3xl shadow-glass border border-[#CEAB93]/50 flex flex-col sm:flex-row sm:items-center justify-between gap-5">
+        <div className="space-y-1">
+          <div className="flex items-center space-x-2">
+            <FileText className="w-5 h-5 text-[#AD8B73]" />
+            <h3 className="font-extrabold text-[#3E2723] text-lg font-display">
+              Executive Report Document
+            </h3>
+          </div>
+          <p className="text-xs text-[#7D5A44] font-mono">
             Generated on {report.generated_at} • {report.filename}
           </p>
         </div>
 
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center space-x-3.5">
           <button
             onClick={handleCopyMarkdown}
-            className="flex items-center space-x-1.5 px-4 py-2.5 rounded-2xl bg-surface-accent/20 border border-border text-text-primary text-xs font-semibold hover:bg-surface-accent/40 transition-colors cursor-pointer"
+            className="flex items-center space-x-2 px-4 py-3 rounded-2xl bg-white/90 border border-[#CEAB93]/60 text-[#3E2723] text-xs font-bold hover:bg-white hover:border-[#AD8B73] transition-all shadow-sm cursor-pointer"
           >
-            {copied ? <Check className="w-4 h-4 text-primary" /> : <Copy className="w-4 h-4" />}
-            <span>{copied ? 'Copied!' : 'Copy Markdown'}</span>
+            {copied ? <Check className="w-4 h-4 text-[#AD8B73]" /> : <Copy className="w-4 h-4 text-[#AD8B73]" />}
+            <span>{copied ? 'Copied to Clipboard!' : 'Copy Markdown'}</span>
           </button>
 
           <button
             onClick={handleDownloadPDF}
             disabled={downloading}
-            className="flex items-center space-x-2 px-5 py-2.5 rounded-2xl bg-primary text-white text-xs font-semibold hover:bg-primary-hover transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+            className="flex items-center space-x-2.5 px-6 py-3 rounded-2xl bg-gradient-to-r from-[#AD8B73] to-[#3E2723] text-white text-xs md:text-sm font-extrabold hover:from-[#3E2723] hover:to-[#2C1810] shadow-md shadow-[#AD8B73]/25 hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
           >
             {downloading ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin" />
-                <span>Rendering PDF...</span>
+                <span>Compiling PDF...</span>
               </>
             ) : (
               <>
                 <Download className="w-4 h-4" />
-                <span>Download PDF</span>
+                <span>Download Executive PDF</span>
               </>
             )}
           </button>
@@ -100,23 +106,23 @@ export default function ReportMarkdownTab({ report, datasetId }) {
       </div>
 
       {downloadError && (
-        <div className="p-4 rounded-2xl bg-red-50 border border-red-200 text-red-700 text-xs flex items-center space-x-2">
+        <div className="p-4 rounded-2xl bg-red-50 border border-red-200 text-red-700 text-xs flex items-center space-x-2.5 shadow-sm">
           <AlertTriangle className="w-4 h-4 flex-shrink-0" />
-          <span>{downloadError}</span>
+          <span className="font-semibold">{downloadError}</span>
         </div>
       )}
 
-      {/* Structured Sections */}
-      <div className="p-6 md:p-8 rounded-3xl bg-surface border border-border shadow-sm space-y-6 text-text-primary">
+      {/* Structured Sections Reader */}
+      <div className="glass-card p-6 md:p-10 rounded-3xl shadow-glass border border-[#CEAB93]/50 space-y-8 text-[#3E2723]">
         {report.sections?.map((sec) => (
-          <div key={sec.id} className="space-y-2 pb-6 border-b border-border last:border-none last:pb-0">
-            <h4 className="text-base font-bold text-text-primary">
+          <div key={sec.id} className="space-y-3 pb-8 border-b border-[#CEAB93]/30 last:border-none last:pb-0">
+            <h4 className="text-lg font-extrabold text-[#3E2723] font-display">
               {sec.title}
             </h4>
-            <p className="text-xs text-text-secondary italic mb-2">
+            <p className="text-xs text-[#7D5A44] italic font-medium">
               {sec.summary}
             </p>
-            <div className="text-xs md:text-sm text-text-primary leading-relaxed whitespace-pre-line bg-surface-accent/10 p-4 rounded-2xl border border-border/40 font-sans">
+            <div className="text-xs md:text-sm text-[#3E2723] leading-relaxed whitespace-pre-line bg-white/70 p-5 md:p-6 rounded-2xl border border-[#CEAB93]/40 font-sans shadow-inner">
               {sec.markdown_content}
             </div>
           </div>

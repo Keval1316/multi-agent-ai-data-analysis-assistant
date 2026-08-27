@@ -43,7 +43,7 @@ def test_chart_generation_all(clean_dataset):
     for chart in collection.charts:
         assert len(chart.data) > 0
         assert "font" in chart.layout
-        assert chart.layout["font"]["color"] == "#40513B"
+        assert chart.layout["font"]["color"] == "#3E2723"
         assert chart.insights_summary is not None
         assert chart.id.startswith("chart_")
 

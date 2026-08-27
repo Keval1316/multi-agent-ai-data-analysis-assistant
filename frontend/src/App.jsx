@@ -13,9 +13,12 @@ import {
   AlertCircle,
   Database,
   TrendingUp,
-  Lightbulb
+  Lightbulb,
+  CheckCircle2,
+  FileCode2,
+  ArrowRight,
+  ShieldAlert
 } from 'lucide-react';
-import FileUpload from './components/FileUpload';
 import PipelineTracker from './components/PipelineTracker';
 import OverviewTab from './components/OverviewTab';
 import DataQualityTab from './components/DataQualityTab';
@@ -25,8 +28,7 @@ import InsightsTab from './components/InsightsTab';
 import ReportMarkdownTab from './components/ReportMarkdownTab';
 
 export default function App() {
-  // Workflow Stage: 'upload' | 'streaming' | 'dashboard'
-  const [stage, setStage] = useState('upload');
+  const [stage, setStage] = useState('upload'); // 'upload' | 'streaming' | 'dashboard'
   const [selectedFile, setSelectedFile] = useState(null);
   const [currentStep, setCurrentStep] = useState(null);
   const [completedSteps, setCompletedSteps] = useState([]);
@@ -35,7 +37,6 @@ export default function App() {
   const [errorMsg, setErrorMsg] = useState(null);
   const [activeTab, setActiveTab] = useState('overview');
 
-  // Load sample dataset
   const handleSelectSample = async (sampleName) => {
     setErrorMsg(null);
     try {
@@ -77,11 +78,6 @@ ORD-2007,Eve White,Furniture,Table,1,450.00,0,450.00,invalid_date,False,South
 ORD-2008,Frank Miller,Office Supplies,Notebook,5,4.50,0,22.50,2025-01-08,False,N/A
 ORD-2009,Grace Wilson,Electronics,Tablet,1,499.99,0.05,474.99,2025-01-09,False,East
 ORD-2010,Hank Green,electronics,Mouse,2,25.00,0,50.00,2025-01-10,False,West`;
-      } else {
-        // clean_dataset.csv fallback
-        sampleData = `order_id,customer_name,category,product,quantity,unit_price,discount,total_revenue,order_date,is_returned,region
-ORD-1001,Alice Johnson,Electronics,Wireless Headphones,2,79.99,0.00,159.98,2025-01-15,False,North
-ORD-1002,Bob Smith,Furniture,Ergonomic Chair,1,249.50,0.10,224.55,2025-01-16,False,South`;
       }
 
       const file = new File([sampleData], sampleName, { type: mimeType });
@@ -91,7 +87,6 @@ ORD-1002,Bob Smith,Furniture,Ergonomic Chair,1,249.50,0.10,224.55,2025-01-16,Fal
     }
   };
 
-  // Start SSE Streaming Execution
   const handleStartAnalysis = async () => {
     if (!selectedFile) return;
 
@@ -125,7 +120,7 @@ ORD-1002,Bob Smith,Furniture,Ergonomic Chair,1,249.50,0.10,224.55,2025-01-16,Fal
 
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split('\n\n');
-        buffer = lines.pop(); // Keep last incomplete segment
+        buffer = lines.pop();
 
         for (const line of lines) {
           if (!line.trim()) continue;
@@ -176,20 +171,30 @@ ORD-1002,Bob Smith,Furniture,Ergonomic Chair,1,249.50,0.10,224.55,2025-01-16,Fal
   };
 
   return (
-    <div className="min-h-screen bg-canvas text-text-primary flex flex-col font-sans selection:bg-primary/20 selection:text-text-primary">
-      {/* 1. Navigation Top Bar */}
-      <header className="sticky top-0 z-50 bg-surface/90 backdrop-blur-md border-b border-border">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div className="w-9 h-9 rounded-2xl bg-primary text-white flex items-center justify-center shadow-md">
-              <Bot className="w-5 h-5" />
+    <div className="min-h-screen bg-[#FFFBE9] text-[#3E2723] flex flex-col font-sans relative overflow-x-hidden">
+      {/* Background Ambient Glowing Orbs */}
+      <div className="fixed top-0 left-1/4 w-[650px] h-[650px] bg-[#E3CAA5]/30 rounded-full blur-[120px] pointer-events-none -z-10 animate-pulse" style={{ animationDuration: '8s' }} />
+      <div className="fixed bottom-10 right-1/4 w-[550px] h-[550px] bg-[#AD8B73]/20 rounded-full blur-[140px] pointer-events-none -z-10" />
+      <div className="fixed inset-0 bg-dot-grid pointer-events-none -z-10 opacity-60" />
+
+      {/* 1. Header Navigation */}
+      <header className="sticky top-0 z-50 bg-white/85 backdrop-blur-xl border-b border-[#CEAB93]/40 shadow-sm transition-all">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+          <div className="flex items-center space-x-3.5">
+            <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-[#AD8B73] to-[#3E2723] text-white flex items-center justify-center shadow-md shadow-[#AD8B73]/20 ring-2 ring-white/80">
+              <Bot className="w-6 h-6" />
             </div>
             <div>
-              <span className="font-extrabold text-base tracking-tight text-text-primary block leading-none">
-                Multi-Agent Data Analyst
-              </span>
-              <span className="text-[10px] text-text-secondary font-mono">
-                AI CSV & Excel Insight Generator
+              <div className="flex items-center space-x-2">
+                <span className="font-extrabold text-lg tracking-tight text-[#3E2723] font-display">
+                  Multi-Agent Data Analyst
+                </span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-[#AD8B73]/15 text-[#3E2723] border border-[#CEAB93]/50">
+                  v1.0
+                </span>
+              </div>
+              <span className="text-xs text-[#7D5A44] font-medium tracking-wide">
+                Autonomous CSV & Excel Insight Synthesizer
               </span>
             </div>
           </div>
@@ -198,81 +203,100 @@ ORD-1002,Bob Smith,Furniture,Ergonomic Chair,1,249.50,0.10,224.55,2025-01-16,Fal
             {stage === 'dashboard' && (
               <button
                 onClick={handleReset}
-                className="flex items-center space-x-1.5 px-3.5 py-1.5 rounded-xl bg-surface-accent/20 border border-border text-xs font-semibold text-text-primary hover:bg-surface-accent/40 transition-colors cursor-pointer"
+                className="flex items-center space-x-2 px-4 py-2 rounded-2xl bg-white/90 border border-[#CEAB93]/60 text-xs font-bold text-[#3E2723] hover:bg-[#FFFBE9] hover:border-[#AD8B73] transition-all shadow-sm cursor-pointer"
               >
-                <RotateCcw className="w-3.5 h-3.5" />
+                <RotateCcw className="w-3.5 h-3.5 text-[#AD8B73]" />
                 <span>New Analysis</span>
               </button>
             )}
-            <span className="text-xs px-2.5 py-1 rounded-full bg-primary/10 text-primary font-mono font-semibold border border-primary/20">
-              17 Agents Active
-            </span>
+            <div className="hidden sm:flex items-center space-x-1.5 px-3 py-1.5 rounded-full bg-[#AD8B73]/10 border border-[#CEAB93]/50 text-[#3E2723] text-xs font-mono font-semibold">
+              <span className="w-2 h-2 rounded-full bg-[#AD8B73] animate-pulse" />
+              <span>17 Specialized Agents</span>
+            </div>
           </div>
         </div>
       </header>
 
-      {/* 2. Main Content Area */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
+      {/* 2. Main Content Body */}
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-10 md:py-14">
         <AnimatePresence mode="wait">
-          {/* STAGE 1: UPLOAD & HERO */}
+          {/* STAGE 1: HERO & UPLOAD */}
           {stage === 'upload' && (
             <motion.div
               key="upload-stage"
-              initial={{ opacity: 0, y: 12 }}
+              initial={{ opacity: 0, y: 15 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -12 }}
+              exit={{ opacity: 0, y: -15 }}
+              transition={{ duration: 0.3 }}
               className="space-y-10 max-w-3xl mx-auto"
             >
               {/* Hero Banner */}
-              <div className="text-center space-y-3">
-                <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-primary/10 text-primary border border-primary/20 text-xs font-bold font-mono">
-                  <Sparkles className="w-3.5 h-3.5" />
-                  <span>Autonomous Multi-Agent Analysis Pipeline</span>
+              <div className="text-center space-y-4">
+                <div className="inline-flex items-center space-x-2 px-3.5 py-1.5 rounded-full bg-white/90 border border-[#CEAB93]/60 shadow-sm text-xs font-bold text-[#3E2723]">
+                  <Sparkles className="w-4 h-4 text-[#AD8B73] animate-pulse" />
+                  <span>Deterministic Computing • LLM Reasoning • Adversarial Critic</span>
                 </div>
-                <h1 className="text-3xl md:text-5xl font-black text-text-primary tracking-tight">
-                  Turn Raw Datasets into <span className="text-primary">Executive Insights</span>
+
+                <h1 className="text-4xl sm:text-5xl md:text-6xl font-black text-[#3E2723] tracking-tight font-display leading-[1.1]">
+                  Turn Raw Data into <br className="hidden sm:inline" />
+                  <span className="bg-clip-text text-transparent bg-gradient-to-r from-[#3E2723] via-[#AD8B73] to-[#8C6542]">
+                    Executive Intelligence
+                  </span>
                 </h1>
-                <p className="text-sm md:text-base text-text-secondary max-w-xl mx-auto leading-relaxed">
-                  Upload CSV or Excel data. Our 17 specialized AI and deterministic computation agents will profile quality, execute safe SQL, identify anomalies, and build an interactive report.
+
+                <p className="text-sm md:text-base text-[#7D5A44] max-w-xl mx-auto leading-relaxed font-normal">
+                  Ingest CSV or Excel spreadsheets. Our 17 specialized AI and deterministic agents compute statistical moments, audit quality, execute safe SQL, and compile a verified executive report.
                 </p>
               </div>
 
-              {/* Sample Dataset Picker */}
-              <div className="p-4 rounded-3xl bg-surface border border-border space-y-2">
-                <span className="text-xs font-mono uppercase text-text-secondary font-semibold block text-center">
-                  Quick Start with Sample Data
-                </span>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              {/* Sample Datasets Selector */}
+              <div className="glass-card p-5 md:p-6 rounded-3xl space-y-3 shadow-glass">
+                <div className="flex items-center justify-between px-1">
+                  <span className="text-xs font-mono uppercase tracking-wider text-[#7D5A44] font-bold">
+                    Quick Start with Built-in Datasets
+                  </span>
+                  <span className="text-[11px] text-[#7D5A44]">Click to load instant test data</span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                   <button
                     onClick={() => handleSelectSample('clean_dataset.csv')}
-                    className="p-3 rounded-2xl bg-surface-accent/15 border border-border hover:border-primary/60 text-left transition-all text-xs flex items-center space-x-3 cursor-pointer group"
+                    className="p-4 rounded-2xl bg-white/70 border border-[#CEAB93]/40 hover:border-[#AD8B73] hover:bg-white text-left transition-all duration-200 flex items-center space-x-3.5 shadow-sm hover:shadow-md cursor-pointer group"
                   >
-                    <div className="w-8 h-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-bold font-mono group-hover:scale-105 transition-transform">
+                    <div className="w-10 h-10 rounded-xl bg-[#AD8B73]/15 text-[#3E2723] flex items-center justify-center font-mono font-bold text-xs group-hover:scale-105 group-hover:bg-[#AD8B73] group-hover:text-white transition-all shadow-inner">
                       CSV
                     </div>
-                    <div>
-                      <div className="font-bold text-text-primary">Clean E-Commerce Dataset</div>
-                      <div className="text-[10px] text-text-secondary">20 rows • Sales & Regions</div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-bold text-sm text-[#3E2723] truncate group-hover:text-[#AD8B73] transition-colors">
+                        Clean E-Commerce Dataset
+                      </div>
+                      <div className="text-[11px] text-[#7D5A44] font-mono">
+                        20 rows • Sales, Discounts & Regions
+                      </div>
                     </div>
                   </button>
 
                   <button
                     onClick={() => handleSelectSample('messy_dataset.csv')}
-                    className="p-3 rounded-2xl bg-surface-accent/15 border border-border hover:border-primary/60 text-left transition-all text-xs flex items-center space-x-3 cursor-pointer group"
+                    className="p-4 rounded-2xl bg-white/70 border border-[#CEAB93]/40 hover:border-amber-500/80 hover:bg-white text-left transition-all duration-200 flex items-center space-x-3.5 shadow-sm hover:shadow-md cursor-pointer group"
                   >
-                    <div className="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-600 flex items-center justify-center font-bold font-mono group-hover:scale-105 transition-transform">
+                    <div className="w-10 h-10 rounded-xl bg-amber-500/15 text-amber-800 flex items-center justify-center font-mono font-bold text-xs group-hover:scale-105 group-hover:bg-amber-600 group-hover:text-white transition-all shadow-inner">
                       ANOM
                     </div>
-                    <div>
-                      <div className="font-bold text-text-primary">Messy Outlier Dataset</div>
-                      <div className="text-[10px] text-text-secondary">Missing values & extreme outliers</div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-bold text-sm text-[#3E2723] truncate group-hover:text-amber-700 transition-colors">
+                        Messy Outlier Dataset
+                      </div>
+                      <div className="text-[11px] text-[#7D5A44] font-mono">
+                        Extreme outliers & missing values
+                      </div>
                     </div>
                   </button>
                 </div>
               </div>
 
               {/* Drag and Drop Zone */}
-              <div className="p-8 rounded-3xl bg-surface border-2 border-dashed border-border hover:border-primary transition-all text-center space-y-4 shadow-sm">
+              <div className="glass-card p-8 md:p-10 rounded-3xl border-2 border-dashed border-[#CEAB93]/70 hover:border-[#AD8B73] transition-all text-center space-y-5 shadow-glass group">
                 <input
                   type="file"
                   id="file-input"
@@ -284,19 +308,19 @@ ORD-1002,Bob Smith,Furniture,Ergonomic Chair,1,249.50,0.10,224.55,2025-01-16,Fal
                   }}
                   className="hidden"
                 />
-                <label htmlFor="file-input" className="cursor-pointer block space-y-3">
-                  <div className="w-14 h-14 mx-auto rounded-3xl bg-surface-accent/20 border border-border flex items-center justify-center text-primary">
-                    <UploadCloud className="w-7 h-7" />
+                <label htmlFor="file-input" className="cursor-pointer block space-y-4">
+                  <div className="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-[#AD8B73]/20 to-[#E3CAA5]/30 border border-[#CEAB93]/60 flex items-center justify-center text-[#3E2723] group-hover:scale-110 group-hover:text-[#AD8B73] transition-all shadow-sm">
+                    <UploadCloud className="w-8 h-8" />
                   </div>
-                  <div>
-                    <span className="font-bold text-text-primary text-base block">
-                      {selectedFile ? selectedFile.name : 'Choose a CSV or Excel file'}
+                  <div className="space-y-1">
+                    <span className="font-extrabold text-base md:text-lg text-[#3E2723] block font-display">
+                      {selectedFile ? selectedFile.name : 'Choose or Drop your CSV / Excel File'}
                     </span>
-                    <span className="text-xs text-text-secondary">
+                    <p className="text-xs text-[#7D5A44]">
                       {selectedFile
-                        ? `${(selectedFile.size / 1024).toFixed(1)} KB ready`
-                        : 'Drag & drop file here or click to browse'}
-                    </span>
+                        ? `${(selectedFile.size / 1024).toFixed(1)} KB selected and ready`
+                        : 'Supports .CSV, .XLSX, and .XLS up to 10MB'}
+                    </p>
                   </div>
                 </label>
 
@@ -304,23 +328,24 @@ ORD-1002,Bob Smith,Furniture,Ergonomic Chair,1,249.50,0.10,224.55,2025-01-16,Fal
                   <motion.div
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
-                    className="pt-4"
+                    className="pt-2"
                   >
                     <button
                       onClick={handleStartAnalysis}
-                      className="w-full py-4 rounded-2xl bg-primary text-white font-bold text-sm hover:bg-primary-hover shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center space-x-2 cursor-pointer group"
+                      className="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-[#AD8B73] to-[#3E2723] text-white font-extrabold text-sm md:text-base tracking-wide hover:from-[#3E2723] hover:to-[#2C1810] shadow-lg shadow-[#AD8B73]/30 hover:shadow-xl hover:shadow-[#3E2723]/30 hover:scale-[1.01] active:scale-[0.99] transition-all duration-200 flex items-center justify-center space-x-2.5 cursor-pointer"
                     >
-                      <Sparkles className="w-4 h-4 group-hover:rotate-12 transition-transform" />
+                      <Sparkles className="w-5 h-5 animate-pulse" />
                       <span>Launch 17-Agent Pipeline</span>
+                      <ArrowRight className="w-4 h-4 ml-1" />
                     </button>
                   </motion.div>
                 )}
               </div>
 
               {errorMsg && (
-                <div className="p-4 rounded-2xl bg-red-50 border border-red-200 text-red-700 text-xs flex items-center space-x-2">
-                  <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                  <span>{errorMsg}</span>
+                <div className="p-4 rounded-2xl bg-red-50 border border-red-200 text-red-700 text-xs flex items-center space-x-2.5 shadow-sm">
+                  <AlertCircle className="w-4 h-4 flex-shrink-0 text-red-600" />
+                  <span className="font-medium">{errorMsg}</span>
                 </div>
               )}
             </motion.div>
@@ -330,9 +355,9 @@ ORD-1002,Bob Smith,Furniture,Ergonomic Chair,1,249.50,0.10,224.55,2025-01-16,Fal
           {stage === 'streaming' && (
             <motion.div
               key="streaming-stage"
-              initial={{ opacity: 0, y: 12 }}
+              initial={{ opacity: 0, y: 15 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -12 }}
+              exit={{ opacity: 0, y: -15 }}
               className="space-y-6"
             >
               <PipelineTracker
@@ -343,14 +368,14 @@ ORD-1002,Bob Smith,Furniture,Ergonomic Chair,1,249.50,0.10,224.55,2025-01-16,Fal
               />
 
               {errorMsg && (
-                <div className="max-w-4xl mx-auto p-4 rounded-2xl bg-red-50 border border-red-200 text-red-700 text-xs flex items-center justify-between">
+                <div className="max-w-4xl mx-auto p-4 rounded-2xl bg-red-50 border border-red-200 text-red-700 text-xs flex items-center justify-between shadow-sm">
                   <div className="flex items-center space-x-2">
                     <AlertCircle className="w-4 h-4 flex-shrink-0" />
                     <span>{errorMsg}</span>
                   </div>
                   <button
                     onClick={handleReset}
-                    className="px-3 py-1 rounded-xl bg-red-100 font-bold hover:bg-red-200 cursor-pointer"
+                    className="px-3.5 py-1.5 rounded-xl bg-red-100 font-bold hover:bg-red-200 cursor-pointer"
                   >
                     Retry
                   </button>
@@ -363,39 +388,45 @@ ORD-1002,Bob Smith,Furniture,Ergonomic Chair,1,249.50,0.10,224.55,2025-01-16,Fal
           {stage === 'dashboard' && finalReport && (
             <motion.div
               key="dashboard-stage"
-              initial={{ opacity: 0, y: 12 }}
+              initial={{ opacity: 0, y: 15 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -12 }}
+              exit={{ opacity: 0, y: -15 }}
               className="space-y-8"
             >
-              {/* Header Title Banner */}
-              <div className="p-6 md:p-8 rounded-3xl bg-surface border border-border shadow-sm flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                <div className="space-y-1">
-                  <div className="flex items-center space-x-2">
-                    <span className="text-xs font-bold uppercase font-mono px-2.5 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
-                      Analysis Complete
+              {/* Executive Header Banner */}
+              <div className="glass-card p-6 md:p-8 rounded-3xl shadow-glass flex flex-col md:flex-row md:items-center md:justify-between gap-5 border border-[#CEAB93]/50">
+                <div className="space-y-1.5">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-xs font-bold uppercase font-mono px-3 py-0.5 rounded-full bg-[#AD8B73]/15 text-[#3E2723] border border-[#CEAB93]/60 flex items-center gap-1.5">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-[#AD8B73]" />
+                      Multi-Agent Synthesis Complete
                     </span>
-                    <span className="text-xs text-text-secondary font-mono">
-                      Quality: <b>Grade {finalReport.quality?.grade || 'A'}</b> ({finalReport.quality?.quality_score || 95}/100)
+                    <span className="text-xs font-mono font-bold px-2.5 py-0.5 rounded-full bg-white border border-[#CEAB93]/50 text-[#3E2723]">
+                      Grade {finalReport.quality?.grade || 'A'} ({finalReport.quality?.quality_score || 98}/100)
                     </span>
                   </div>
-                  <h2 className="text-2xl md:text-3xl font-extrabold text-text-primary tracking-tight">
+                  <h2 className="text-2xl md:text-3xl font-extrabold text-[#3E2723] tracking-tight font-display">
                     {finalReport.title}
                   </h2>
-                  <p className="text-xs md:text-sm text-text-secondary">
+                  <p className="text-xs md:text-sm text-[#7D5A44] font-medium">
                     {finalReport.subtitle}
                   </p>
                 </div>
 
                 <div className="flex items-center space-x-3 self-start md:self-center">
-                  <span className="text-xs text-text-secondary font-mono">
-                    {finalReport.profile?.total_rows?.toLocaleString()} Rows • {finalReport.profile?.total_columns} Cols
-                  </span>
+                  <div className="p-3 px-4 rounded-2xl bg-white/90 border border-[#CEAB93]/40 text-center shadow-sm">
+                    <span className="text-[10px] uppercase font-mono text-[#7D5A44] block font-bold">Records</span>
+                    <span className="text-base font-bold text-[#3E2723] font-mono">{finalReport.profile?.total_rows?.toLocaleString()}</span>
+                  </div>
+                  <div className="p-3 px-4 rounded-2xl bg-white/90 border border-[#CEAB93]/40 text-center shadow-sm">
+                    <span className="text-[10px] uppercase font-mono text-[#7D5A44] block font-bold">Variables</span>
+                    <span className="text-base font-bold text-[#3E2723] font-mono">{finalReport.profile?.total_columns}</span>
+                  </div>
                 </div>
               </div>
 
-              {/* Navigation Tabs Bar */}
-              <div className="flex items-center space-x-2 overflow-x-auto pb-1 border-b border-border text-xs font-semibold">
+              {/* Navigation Segmented Tab Bar */}
+              <div className="flex items-center space-x-2 overflow-x-auto pb-1 text-xs font-bold font-sans">
                 {[
                   { id: 'overview', label: 'Executive Overview', icon: Sparkles },
                   { id: 'quality', label: 'Data Quality & Schema', icon: ShieldCheck },
@@ -410,13 +441,13 @@ ORD-1002,Bob Smith,Furniture,Ergonomic Chair,1,249.50,0.10,224.55,2025-01-16,Fal
                     <button
                       key={tab.id}
                       onClick={() => setActiveTab(tab.id)}
-                      className={`flex items-center space-x-2 px-4 py-2.5 rounded-2xl transition-all cursor-pointer whitespace-nowrap ${
+                      className={`flex items-center space-x-2 px-4 py-3 rounded-2xl transition-all duration-200 cursor-pointer whitespace-nowrap ${
                         isActive
-                          ? 'bg-primary text-white shadow-sm'
-                          : 'bg-surface text-text-secondary hover:text-text-primary hover:bg-surface-accent/20 border border-border'
+                          ? 'bg-gradient-to-r from-[#AD8B73] to-[#3E2723] text-white shadow-md shadow-[#AD8B73]/20 scale-100'
+                          : 'glass-card text-[#3E2723] hover:bg-white/95 border-[#CEAB93]/40'
                       }`}
                     >
-                      <Icon className="w-3.5 h-3.5" />
+                      <Icon className={`w-4 h-4 ${isActive ? 'text-white' : 'text-[#AD8B73]'}`} />
                       <span>{tab.label}</span>
                     </button>
                   );
@@ -440,8 +471,8 @@ ORD-1002,Bob Smith,Furniture,Ergonomic Chair,1,249.50,0.10,224.55,2025-01-16,Fal
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-border bg-surface/50 py-6 text-center text-xs text-text-secondary font-mono">
-        Multi-Agent AI Data Analysis Assistant • Built with LangGraph, DuckDB & Plotly
+      <footer className="border-t border-[#CEAB93]/40 bg-white/60 backdrop-blur-md py-6 text-center text-xs text-[#7D5A44] font-mono">
+        Multi-Agent AI Data Analysis Assistant • LangGraph Orchestration & DuckDB Engine
       </footer>
     </div>
   );

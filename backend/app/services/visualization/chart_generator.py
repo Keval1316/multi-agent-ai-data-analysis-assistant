@@ -11,14 +11,14 @@ from backend.app.models.visualization import PlotlyChartSpec, ChartCollection
 class ChartGenerator:
     """Deterministic Plotly chart specification generator implementing the custom palette tokens."""
 
-    COLOR_PRIMARY = "#609966"
-    COLOR_DARK = "#40513B"
-    COLOR_ACCENT = "#9DC08B"
+    COLOR_PRIMARY = "#AD8B73"
+    COLOR_DARK = "#3E2723"
+    COLOR_ACCENT = "#CEAB93"
     COLOR_BG_CARD = "#FFFFFF"
-    COLOR_GRID = "rgba(157, 192, 139, 0.25)"
+    COLOR_GRID = "rgba(206, 171, 147, 0.25)"
     PALETTE_SEQUENCE = [
-        "#609966", "#40513B", "#9DC08B", "#82A776",
-        "#2E3A2A", "#A8D18D", "#4B6B48", "#709665"
+        "#AD8B73", "#3E2723", "#CEAB93", "#E3CAA5",
+        "#8C6542", "#5C3D2E", "#D4B996", "#7D5A44"
     ]
 
     @classmethod

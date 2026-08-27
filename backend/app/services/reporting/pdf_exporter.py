@@ -40,10 +40,10 @@ class NumberedCanvas(canvas.Canvas):
     def draw_page_number(self, page_count):
         self.saveState()
         self.setFont("Helvetica", 8)
-        self.setFillColor(colors.HexColor("#609966"))
+        self.setFillColor(colors.HexColor("#AD8B73"))
 
         # Running footer line
-        self.setStrokeColor(colors.HexColor("#9DC08B"))
+        self.setStrokeColor(colors.HexColor("#CEAB93"))
         self.setLineWidth(0.5)
         self.line(40, 35, 572, 35)
 
@@ -58,13 +58,13 @@ class PDFExporter:
     """Deterministic PDF generation service producing pixel-perfect executive reports with custom design palette."""
 
     # Color Palette Tokens
-    C_DARK = colors.HexColor("#40513B")
-    C_PRIMARY = colors.HexColor("#609966")
-    C_ACCENT = colors.HexColor("#9DC08B")
-    C_LIGHT = colors.HexColor("#EDF1D6")
-    C_CARD_BG = colors.HexColor("#F8FAF2")
+    C_DARK = colors.HexColor("#3E2723")
+    C_PRIMARY = colors.HexColor("#AD8B73")
+    C_ACCENT = colors.HexColor("#CEAB93")
+    C_LIGHT = colors.HexColor("#FFFBE9")
+    C_CARD_BG = colors.HexColor("#FDFBF7")
     C_WHITE = colors.HexColor("#FFFFFF")
-    C_TEXT = colors.HexColor("#2E3A2A")
+    C_TEXT = colors.HexColor("#4A3525")
 
     @classmethod
     def generate_pdf(cls, report: AnalysisReport) -> bytes:
@@ -214,7 +214,7 @@ class PDFExporter:
         story.append(Paragraph("Verified Evidence-Grounded Insights", h1_style))
         for ins in report.insights.insights:
             card_content = [
-                Paragraph(f"<b>{ins.title}</b> <font color='#609966'>({ins.category} • {ins.importance} Priority)</font>", h2_style),
+                Paragraph(f"<b>{ins.title}</b> <font color='#AD8B73'>({ins.category} • {ins.importance} Priority)</font>", h2_style),
                 Paragraph(f"<b>Finding:</b> {ins.finding}", body_style),
                 Paragraph(f"<b>Supporting Evidence:</b> {ins.supporting_evidence}", meta_style),
             ]

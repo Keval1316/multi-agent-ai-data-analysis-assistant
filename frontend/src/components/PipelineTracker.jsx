@@ -12,7 +12,9 @@ import {
   Lightbulb,
   FileCheck,
   ShieldAlert,
-  FileText
+  FileText,
+  Clock,
+  Cpu
 } from 'lucide-react';
 
 const PIPELINE_STEPS = [
@@ -21,16 +23,16 @@ const PIPELINE_STEPS = [
   { id: 'profile_and_audit', index: 3, label: 'Profiling Schema & Quality Audit', agent: 'QualityChecker', icon: ShieldAlert },
   { id: 'understand_dataset', index: 4, label: 'Synthesizing Domain & Key KPIs', agent: 'DatasetUnderstandingAgent', icon: Bot },
   { id: 'plan_analysis', index: 5, label: 'Formulating Analysis Plan', agent: 'AnalysisPlanningAgent', icon: Layers },
-  { id: 'run_statistical_analysis', index: 6, label: 'Computing Distributions & Correlations', agent: 'StatisticalEngine', icon: BarChart3 },
+  { id: 'run_statistical_analysis', index: 6, label: 'Computing Distributions & Moments', agent: 'StatisticalEngine', icon: BarChart3 },
   { id: 'generate_sql', index: 7, label: 'Synthesizing Analytical DuckDB SQL', agent: 'SQLGenerationAgent', icon: Bot },
-  { id: 'validate_sql', index: 8, label: 'Verifying SQL Syntax & Security', agent: 'SQLValidator', icon: ShieldAlert },
+  { id: 'validate_sql', index: 8, label: 'Verifying SQL Syntax & Security Guards', agent: 'SQLValidator', icon: ShieldAlert },
   { id: 'execute_sql', index: 9, label: 'Executing In-Memory DuckDB Queries', agent: 'SQLExecutor', icon: Database },
-  { id: 'detect_patterns', index: 10, label: 'Discovering Trends, Pareto & Anomalies', agent: 'PatternDetector', icon: BarChart3 },
-  { id: 'select_visualizations', index: 11, label: 'Selecting Optimal Chart Types', agent: 'ChartGenerator', icon: BarChart3 },
+  { id: 'detect_patterns', index: 10, label: 'Discovering Trends & Anomaly Outliers', agent: 'PatternDetector', icon: BarChart3 },
+  { id: 'select_visualizations', index: 11, label: 'Selecting Optimal Chart Heuristics', agent: 'ChartGenerator', icon: BarChart3 },
   { id: 'render_charts', index: 12, label: 'Compiling Interactive Plotly Visuals', agent: 'ChartGenerator', icon: BarChart3 },
   { id: 'generate_insights', index: 13, label: 'Deriving Evidence-Grounded Insights', agent: 'InsightGenerationAgent', icon: Lightbulb },
   { id: 'critic_review', index: 14, label: 'Adversarial Fact-Checking & Auditing', agent: 'CriticReviewAgent', icon: ShieldAlert },
-  { id: 'revise_insights', index: 15, label: 'Refining Findings & Capping Revisions', agent: 'InsightRevisionOrchestrator', icon: Bot },
+  { id: 'revise_insights', index: 15, label: 'Refining Findings & Capping Loops', agent: 'InsightRevisionOrchestrator', icon: Bot },
   { id: 'generate_report', index: 16, label: 'Compiling Executive Markdown Report', agent: 'ReportGenerationAgent', icon: FileText },
   { id: 'render_pdf', index: 17, label: 'Rendering Publication-Grade PDF', agent: 'PDFExporter', icon: FileText },
 ];
@@ -57,49 +59,61 @@ export default function PipelineTracker({ currentStep, completedSteps = [], live
     <motion.div
       initial={{ opacity: 0, scale: 0.98 }}
       animate={{ opacity: 1, scale: 1 }}
-      className="p-6 md:p-8 rounded-3xl bg-surface border border-border shadow-sm space-y-6 max-w-4xl mx-auto"
+      className="glass-card p-6 md:p-8 rounded-3xl space-y-6 max-w-4xl mx-auto shadow-glass border border-[#CEAB93]/60"
     >
-      {/* 1. Header & Timer */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-border">
-        <div className="space-y-1">
+      {/* 1. Header & Live Clock */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-[#CEAB93]/40">
+        <div className="space-y-1.5">
           <div className="flex items-center space-x-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-primary animate-ping" />
-            <span className="text-xs font-bold uppercase tracking-wider text-primary font-mono">
-              Live Multi-Agent Pipeline Running
+            <span className="relative flex h-3 w-3">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#AD8B73] opacity-75" />
+              <span className="relative inline-flex rounded-full h-3 w-3 bg-[#AD8B73]" />
+            </span>
+            <span className="text-xs font-bold uppercase tracking-wider text-[#3E2723] font-mono">
+              Live Multi-Agent Orchestration Active
             </span>
           </div>
-          <h3 className="text-xl md:text-2xl font-bold text-text-primary">
-            Analyzing <span className="text-primary font-mono">{filename}</span>
+          <h3 className="text-xl md:text-2xl font-black text-[#3E2723] font-display">
+            Analyzing <span className="font-mono text-[#AD8B73] bg-[#AD8B73]/10 px-2 py-0.5 rounded-xl">{filename}</span>
           </h3>
-          <p className="text-xs text-text-secondary">
-            17 autonomous specialized agent nodes collaborating deterministically.
+          <p className="text-xs text-[#7D5A44]">
+            17 autonomous specialized nodes executing deterministic calculations & LLM reasoning.
           </p>
         </div>
 
-        <div className="flex items-center space-x-4 self-start sm:self-center">
-          <div className="px-4 py-2 rounded-2xl bg-surface-accent/20 border border-border text-center">
-            <span className="text-[10px] uppercase font-mono text-text-secondary block font-semibold">Elapsed</span>
-            <span className="text-base font-mono font-bold text-text-primary">{formatTimer(elapsedSeconds)}</span>
+        <div className="flex items-center space-x-3 self-start sm:self-center">
+          <div className="px-4 py-2.5 rounded-2xl bg-white/90 border border-[#CEAB93]/50 shadow-sm text-center">
+            <div className="flex items-center space-x-1.5 text-[10px] uppercase font-mono text-[#7D5A44] font-bold justify-center">
+              <Clock className="w-3 h-3" />
+              <span>Elapsed</span>
+            </div>
+            <span className="text-base font-mono font-extrabold text-[#3E2723]">{formatTimer(elapsedSeconds)}</span>
           </div>
-          <div className="px-4 py-2 rounded-2xl bg-primary/10 border border-primary/20 text-center">
-            <span className="text-[10px] uppercase font-mono text-primary block font-semibold">Progress</span>
-            <span className="text-base font-mono font-bold text-primary">{progressPct}%</span>
+          <div className="px-4 py-2.5 rounded-2xl bg-gradient-to-br from-[#AD8B73]/15 to-[#E3CAA5]/30 border border-[#AD8B73]/40 shadow-sm text-center">
+            <span className="text-[10px] uppercase font-mono text-[#3E2723] block font-bold">Progress</span>
+            <span className="text-base font-mono font-extrabold text-[#3E2723]">{progressPct}%</span>
           </div>
         </div>
       </div>
 
-      {/* 2. Progress Bar */}
-      <div className="w-full bg-surface-accent/30 rounded-full h-2.5 overflow-hidden border border-border">
-        <motion.div
-          className="bg-primary h-full rounded-full"
-          initial={{ width: 0 }}
-          animate={{ width: `${progressPct}%` }}
-          transition={{ duration: 0.3 }}
-        />
+      {/* 2. Dynamic Progress Bar */}
+      <div className="space-y-1.5">
+        <div className="flex justify-between text-xs font-mono font-semibold text-[#7D5A44]">
+          <span>Pipeline Nodes Completed: {completedSteps.length}/17</span>
+          <span>{progressPct}%</span>
+        </div>
+        <div className="w-full bg-[#E3CAA5]/30 rounded-full h-3 overflow-hidden border border-[#CEAB93]/50 shadow-inner">
+          <motion.div
+            className="bg-gradient-to-r from-[#AD8B73] to-[#3E2723] h-full rounded-full shadow-sm"
+            initial={{ width: 0 }}
+            animate={{ width: `${progressPct}%` }}
+            transition={{ duration: 0.3 }}
+          />
+        </div>
       </div>
 
-      {/* 3. 17-Step Agent Rail */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 pt-2 max-h-[460px] overflow-y-auto pr-1">
+      {/* 3. 17-Step Agent Rail - Full Height Without Inner Scroller */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
         {PIPELINE_STEPS.map((step) => {
           const isCompleted = completedSteps.includes(step.id);
           const isRunning = currentStep === step.id;
@@ -109,46 +123,52 @@ export default function PipelineTracker({ currentStep, completedSteps = [], live
           return (
             <div
               key={step.id}
-              className={`p-3 rounded-2xl border transition-all duration-200 flex items-start space-x-3 ${
+              className={`p-3.5 rounded-2xl border transition-all duration-300 flex items-start space-x-3.5 ${
                 isRunning
-                  ? 'bg-primary/5 border-primary shadow-sm'
+                  ? 'bg-white border-[#AD8B73] shadow-md ring-2 ring-[#AD8B73]/20'
                   : isCompleted
-                  ? 'bg-surface-accent/15 border-border/80'
-                  : 'bg-surface/50 border-border/40 opacity-50'
+                  ? 'bg-white/85 border-[#CEAB93]/50'
+                  : 'bg-white/40 border-[#CEAB93]/20 opacity-55'
               }`}
             >
-              <div className="mt-0.5 flex-shrink-0">
+              <div className="mt-1 flex-shrink-0">
                 {isCompleted ? (
-                  <CheckCircle2 className="w-4 h-4 text-primary" />
+                  <div className="w-5 h-5 rounded-full bg-[#AD8B73]/15 flex items-center justify-center text-[#AD8B73]">
+                    <CheckCircle2 className="w-4 h-4" />
+                  </div>
                 ) : isRunning ? (
-                  <Loader2 className="w-4 h-4 text-primary animate-spin" />
+                  <div className="w-5 h-5 rounded-full bg-[#AD8B73]/20 flex items-center justify-center text-[#3E2723]">
+                    <Loader2 className="w-4 h-4 animate-spin text-[#AD8B73]" />
+                  </div>
                 ) : (
-                  <Circle className="w-4 h-4 text-text-secondary/40" />
+                  <div className="w-5 h-5 rounded-full bg-gray-200/50 flex items-center justify-center text-gray-400">
+                    <Circle className="w-3.5 h-3.5" />
+                  </div>
                 )}
               </div>
 
-              <div className="flex-1 min-w-0 space-y-0.5">
+              <div className="flex-1 min-w-0 space-y-1">
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-mono text-text-secondary uppercase">
-                    Step {step.index}/17 • {step.agent}
+                  <span className="text-[10px] font-mono text-[#7D5A44] font-bold uppercase">
+                    Node {step.index}/17 • {step.agent}
                   </span>
                   {isRunning && (
-                    <span className="text-[9px] font-bold uppercase px-1.5 py-0.2 rounded bg-primary text-white animate-pulse">
-                      Active
+                    <span className="text-[9px] font-bold uppercase px-2 py-0.5 rounded-full bg-[#AD8B73] text-white animate-pulse">
+                      Executing
                     </span>
                   )}
                 </div>
-                <h4 className="text-xs font-semibold text-text-primary truncate">
+                <h4 className="text-xs font-bold text-[#3E2723] truncate">
                   {step.label}
                 </h4>
 
                 {preview && (
-                  <div className="text-[10px] text-text-secondary bg-surface rounded-md p-1.5 mt-1 border border-border/60">
-                    {preview.quality_score && <span>Quality: <b>{preview.quality_score}/100</b> ({preview.grade})</span>}
-                    {preview.domain && <span>Domain: <b>{preview.domain}</b></span>}
-                    {preview.metrics_count && <span>Computed <b>{preview.metrics_count}</b> moments, <b>{preview.correlations_count}</b> correlations</span>}
+                  <div className="text-[11px] text-[#3E2723] bg-[#FFFBE9]/80 rounded-xl p-2 mt-1 border border-[#CEAB93]/50 font-medium">
+                    {preview.quality_score && <span>Quality Score: <b>{preview.quality_score}/100</b> ({preview.grade})</span>}
+                    {preview.domain && <span>Inferred Domain: <b>{preview.domain}</b></span>}
+                    {preview.metrics_count && <span>Moments: <b>{preview.metrics_count}</b>, Correlations: <b>{preview.correlations_count}</b></span>}
                     {preview.top_title && <span>Top Insight: <b>{preview.top_title}</b></span>}
-                    {preview.report_title && <span>Compiled <b>{preview.sections_count}</b> report sections</span>}
+                    {preview.report_title && <span>Compiled <b>{preview.sections_count}</b> sections</span>}
                   </div>
                 )}
               </div>
