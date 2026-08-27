@@ -75,12 +75,18 @@ class ChartGenerator:
         num_col: str,
         title: Optional[str] = None
     ) -> Optional[PlotlyChartSpec]:
-        if cat_col not in df.columns or num_col not in df.columns:
+        if cat_col not in df.columns or num_col not in df.columns or cat_col == num_col:
             return None
 
-        clean = df[[cat_col, num_col]].dropna()
-        clean[num_col] = pd.to_numeric(clean[num_col], errors="coerce")
-        clean = clean.dropna()
+        raw_c = df[cat_col]
+        raw_n = df[num_col]
+        c_s = raw_c.iloc[:, 0] if isinstance(raw_c, pd.DataFrame) else raw_c
+        n_s = raw_n.iloc[:, 0] if isinstance(raw_n, pd.DataFrame) else raw_n
+
+        clean = pd.DataFrame({
+            cat_col: c_s,
+            num_col: pd.to_numeric(n_s, errors="coerce")
+        }).dropna()
         if len(clean) == 0:
             return None
 
@@ -123,13 +129,18 @@ class ChartGenerator:
         num_col: str,
         title: Optional[str] = None
     ) -> Optional[PlotlyChartSpec]:
-        if dt_col not in df.columns or num_col not in df.columns:
+        if dt_col not in df.columns or num_col not in df.columns or dt_col == num_col:
             return None
 
-        clean = df[[dt_col, num_col]].dropna().copy()
-        clean[dt_col] = pd.to_datetime(clean[dt_col], errors="coerce", format="mixed")
-        clean[num_col] = pd.to_numeric(clean[num_col], errors="coerce")
-        clean = clean.dropna().sort_values(by=dt_col)
+        raw_d = df[dt_col]
+        raw_n = df[num_col]
+        d_s = raw_d.iloc[:, 0] if isinstance(raw_d, pd.DataFrame) else raw_d
+        n_s = raw_n.iloc[:, 0] if isinstance(raw_n, pd.DataFrame) else raw_n
+
+        clean = pd.DataFrame({
+            dt_col: pd.to_datetime(d_s, errors="coerce", format="mixed"),
+            num_col: pd.to_numeric(n_s, errors="coerce")
+        }).dropna().sort_values(by=dt_col)
         if len(clean) < 3:
             return None
 
@@ -171,13 +182,23 @@ class ChartGenerator:
         num_col_y: str,
         cat_col: Optional[str] = None
     ) -> Optional[PlotlyChartSpec]:
-        if num_col_x not in df.columns or num_col_y not in df.columns:
+        if num_col_x not in df.columns or num_col_y not in df.columns or num_col_x == num_col_y:
             return None
 
-        clean = df[[num_col_x, num_col_y] + ([cat_col] if cat_col and cat_col in df.columns else [])].dropna().copy()
-        clean[num_col_x] = pd.to_numeric(clean[num_col_x], errors="coerce")
-        clean[num_col_y] = pd.to_numeric(clean[num_col_y], errors="coerce")
-        clean = clean.dropna()
+        raw_x = df[num_col_x]
+        raw_y = df[num_col_y]
+        x_s = raw_x.iloc[:, 0] if isinstance(raw_x, pd.DataFrame) else raw_x
+        y_s = raw_y.iloc[:, 0] if isinstance(raw_y, pd.DataFrame) else raw_y
+
+        data_dict = {
+            num_col_x: pd.to_numeric(x_s, errors="coerce"),
+            num_col_y: pd.to_numeric(y_s, errors="coerce")
+        }
+        if cat_col and cat_col in df.columns and cat_col not in [num_col_x, num_col_y]:
+            raw_c = df[cat_col]
+            data_dict[cat_col] = raw_c.iloc[:, 0] if isinstance(raw_c, pd.DataFrame) else raw_c
+
+        clean = pd.DataFrame(data_dict).dropna()
         if len(clean) < 3:
             return None
 
@@ -226,12 +247,18 @@ class ChartGenerator:
         cat_col: str,
         num_col: str
     ) -> Optional[PlotlyChartSpec]:
-        if cat_col not in df.columns or num_col not in df.columns:
+        if cat_col not in df.columns or num_col not in df.columns or cat_col == num_col:
             return None
 
-        clean = df[[cat_col, num_col]].dropna().copy()
-        clean[num_col] = pd.to_numeric(clean[num_col], errors="coerce")
-        clean = clean.dropna()
+        raw_c = df[cat_col]
+        raw_n = df[num_col]
+        c_s = raw_c.iloc[:, 0] if isinstance(raw_c, pd.DataFrame) else raw_c
+        n_s = raw_n.iloc[:, 0] if isinstance(raw_n, pd.DataFrame) else raw_n
+
+        clean = pd.DataFrame({
+            cat_col: c_s,
+            num_col: pd.to_numeric(n_s, errors="coerce")
+        }).dropna()
         if len(clean) == 0:
             return None
 

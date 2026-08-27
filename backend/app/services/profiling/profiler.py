@@ -16,13 +16,15 @@ from backend.app.models.profile import (
 class DatasetProfiler:
     """Deterministic dataset profiler computing distributions, types, nulls, and statistics."""
 
-    @staticmethod
-    def infer_semantic_type(series: pd.Series, col_name: str) -> Tuple[str, Optional[pd.Series]]:
+    @classmethod
+    def infer_semantic_type(cls, series: pd.Series, col_name: str) -> Tuple[str, Optional[pd.Series]]:
         """
         Determines the semantic type of a column:
         'boolean', 'datetime', 'numeric', 'identifier', or 'categorical'.
         Returns (semantic_type, converted_series_or_none).
         """
+        if isinstance(series, pd.DataFrame):
+            series = series.iloc[:, 0]
         total_len = len(series)
         non_null_series = series.dropna()
         if len(non_null_series) == 0:
@@ -93,6 +95,8 @@ class DatasetProfiler:
     @classmethod
     def compute_numeric_stats(cls, series: pd.Series) -> Optional[NumericStats]:
         """Calculates deterministic numerical summary statistics."""
+        if isinstance(series, pd.DataFrame):
+            series = series.iloc[:, 0]
         clean_s = pd.to_numeric(series, errors="coerce").dropna()
         if len(clean_s) == 0:
             return None
@@ -119,6 +123,8 @@ class DatasetProfiler:
     @classmethod
     def compute_categorical_stats(cls, series: pd.Series, total_rows: int) -> CategoricalStats:
         """Calculates frequency table and cardinality for categorical columns."""
+        if isinstance(series, pd.DataFrame):
+            series = series.iloc[:, 0]
         non_null = series.dropna().astype(str)
         unique_cnt = int(non_null.nunique())
         val_counts = non_null.value_counts().head(5)
@@ -144,6 +150,8 @@ class DatasetProfiler:
     @classmethod
     def compute_datetime_stats(cls, dt_series: pd.Series) -> Optional[DatetimeStats]:
         """Calculates temporal min, max, and duration."""
+        if isinstance(dt_series, pd.DataFrame):
+            dt_series = dt_series.iloc[:, 0]
         clean_dt = pd.to_datetime(dt_series, errors="coerce", format="mixed").dropna()
         if len(clean_dt) == 0:
             return None
@@ -175,8 +183,9 @@ class DatasetProfiler:
         bool_cols: List[str] = []
         id_cols: List[str] = []
 
-        for col in df.columns:
-            series = df[col]
+        for idx, col in enumerate(df.columns):
+            raw_series = df.iloc[:, idx] if isinstance(df[col], pd.DataFrame) else df[col]
+            series = raw_series.iloc[:, 0] if isinstance(raw_series, pd.DataFrame) else raw_series
             null_count = int(series.isna().sum())
             null_pct = round((null_count / total_rows) * 100, 2) if total_rows > 0 else 0.0
             unique_count = int(series.nunique(dropna=True))

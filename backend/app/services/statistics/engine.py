@@ -36,7 +36,9 @@ class StatisticalEngine:
         for col in numeric_cols:
             if col not in df.columns:
                 continue
-            s = pd.to_numeric(df[col], errors="coerce").dropna()
+            s_raw = df[col]
+            s_1d = s_raw.iloc[:, 0] if isinstance(s_raw, pd.DataFrame) else s_raw
+            s = pd.to_numeric(s_1d, errors="coerce").dropna()
             if len(s) == 0:
                 continue
 
@@ -87,26 +89,31 @@ class StatisticalEngine:
             if len(pair) != 2:
                 continue
             c1, c2 = pair[0], pair[1]
-            if c1 not in df.columns or c2 not in df.columns:
+            if c1 not in df.columns or c2 not in df.columns or c1 == c2:
                 continue
 
-            sub_df = df[[c1, c2]].copy()
-            sub_df[c1] = pd.to_numeric(sub_df[c1], errors="coerce")
-            sub_df[c2] = pd.to_numeric(sub_df[c2], errors="coerce")
-            clean_sub = sub_df.dropna()
+            s1_raw = df[c1]
+            s2_raw = df[c2]
+            s1 = s1_raw.iloc[:, 0] if isinstance(s1_raw, pd.DataFrame) else s1_raw
+            s2 = s2_raw.iloc[:, 0] if isinstance(s2_raw, pd.DataFrame) else s2_raw
 
-            if len(clean_sub) < 3:
+            sub_df = pd.DataFrame({
+                c1: pd.to_numeric(s1, errors="coerce"),
+                c2: pd.to_numeric(s2, errors="coerce")
+            }).dropna()
+
+            if len(sub_df) < 3:
                 continue
 
             # Pearson
             try:
-                p_coef, p_pval = stats.pearsonr(clean_sub[c1], clean_sub[c2])
+                p_coef, p_pval = stats.pearsonr(sub_df[c1], sub_df[c2])
             except Exception:
                 p_coef, p_pval = float("nan"), None
 
             # Spearman
             try:
-                s_coef, s_pval = stats.spearmanr(clean_sub[c1], clean_sub[c2])
+                s_coef, s_pval = stats.spearmanr(sub_df[c1], sub_df[c2])
             except Exception:
                 s_coef, s_pval = float("nan"), None
 
@@ -133,12 +140,18 @@ class StatisticalEngine:
         for gp in plan.group_by_analyses:
             g_col = gp.group_column
             m_col = gp.metric_column
-            if g_col not in df.columns or m_col not in df.columns:
+            if g_col not in df.columns or m_col not in df.columns or g_col == m_col:
                 continue
 
-            sub_df = df[[g_col, m_col]].copy()
-            sub_df[m_col] = pd.to_numeric(sub_df[m_col], errors="coerce")
-            clean_df = sub_df.dropna()
+            g_raw = df[g_col]
+            m_raw = df[m_col]
+            g_s = g_raw.iloc[:, 0] if isinstance(g_raw, pd.DataFrame) else g_raw
+            m_s = m_raw.iloc[:, 0] if isinstance(m_raw, pd.DataFrame) else m_raw
+
+            clean_df = pd.DataFrame({
+                g_col: g_s,
+                m_col: pd.to_numeric(m_s, errors="coerce")
+            }).dropna()
 
             if len(clean_df) == 0:
                 continue

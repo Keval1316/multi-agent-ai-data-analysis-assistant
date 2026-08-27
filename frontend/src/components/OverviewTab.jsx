@@ -40,11 +40,12 @@ export default function OverviewTab({ report }) {
 
   const datasetId = report.dataset_id;
   const { understanding, profile, quality, statistics, sql_results, patterns, charts, insights, cleaning_summary } = report;
+  const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
   const handleDownloadCsv = async () => {
     try {
       setDownloadingCsv(true);
-      const res = await fetch(`http://localhost:8000/api/dataset/${datasetId}/download/cleaned-csv`);
+      const res = await fetch(`${apiBase}/api/dataset/${datasetId}/download/cleaned-csv`);
       if (!res.ok) throw new Error('Failed to download cleaned CSV');
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);
@@ -65,7 +66,7 @@ export default function OverviewTab({ report }) {
   const handleDownloadExcel = async () => {
     try {
       setDownloadingXlsx(true);
-      const res = await fetch(`http://localhost:8000/api/dataset/${datasetId}/download/cleaned-excel`);
+      const res = await fetch(`${apiBase}/api/dataset/${datasetId}/download/cleaned-excel`);
       if (!res.ok) throw new Error('Failed to download cleaned Excel');
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);

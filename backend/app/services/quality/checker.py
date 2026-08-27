@@ -45,6 +45,8 @@ class QualityChecker:
         Distinguishes extreme anomalies (outside 3.0*IQR or |z| >= 3.5) from mild tail values (1.5*IQR to 3.0*IQR).
         Returns (outlier_count, outlier_percentage, sample_outliers, is_extreme).
         """
+        if isinstance(series, pd.DataFrame):
+            series = series.iloc[:, 0]
         num_s = pd.to_numeric(series, errors="coerce").dropna()
         if len(num_s) < 4:
             return 0, 0.0, [], False
@@ -64,26 +66,26 @@ class QualityChecker:
         extreme_outliers = num_s[(num_s < extreme_lower) | (num_s > extreme_upper)]
         mild_outliers = num_s[(num_s < mild_lower) | (num_s > mild_upper)]
 
-        if len(extreme_outliers) > 0:
-            cnt = len(extreme_outliers)
-            pct = round((cnt / len(series)) * 100, 2)
-            samples = [float(x) for x in extreme_outliers.head(3).tolist()]
-            return cnt, pct, samples, True
-        elif len(mild_outliers) > 0:
-            cnt = len(mild_outliers)
-            pct = round((cnt / len(series)) * 100, 2)
-            samples = [float(x) for x in mild_outliers.head(3).tolist()]
-            return cnt, pct, samples, False
+        is_extreme = len(extreme_outliers) > 0
+        target_outliers = extreme_outliers if is_extreme else mild_outliers
 
-        return 0, 0.0, [], False
+        outlier_count = int(len(target_outliers))
+        outlier_pct = round((outlier_count / len(num_s)) * 100, 2)
+        sample_vals = [float(x) for x in target_outliers.head(5).tolist()]
+
+        return outlier_count, outlier_pct, sample_vals, is_extreme
 
     @classmethod
     def audit_dataset(cls, df: pd.DataFrame, profile: DatasetProfile) -> QualityReport:
-        """Runs comprehensive deterministic quality checks against the dataset."""
+        """
+        Executes a deterministic multi-dimension quality audit on the raw dataset.
+        Generates structured QualityIssues and computes the weighted Health Score.
+        """
         issues: List[QualityIssue] = []
         total_rows = profile.total_rows
 
-        # 1. Duplicate Rows Check
+        # 1. Dataset-level Audits
+        # 1a. Duplicate Rows
         if profile.duplicate_rows_count > 0:
             issues.append(
                 QualityIssue(
@@ -102,7 +104,8 @@ class QualityChecker:
         # 2. Column-level Audits
         for col_prof in profile.column_profiles:
             col_name = col_prof.name
-            series = df[col_name]
+            raw_s = df[col_name] if col_name in df.columns else pd.Series(dtype=object)
+            series = raw_s.iloc[:, 0] if isinstance(raw_s, pd.DataFrame) else raw_s
 
             # 2a. Missing Values
             if col_prof.null_count > 0:

@@ -118,7 +118,7 @@ class DatasetLoader:
             clean_name = cls.sanitize_column_name(col, used_names, idx)
             sanitized_columns.append(clean_name)
 
-            series = df[col]
+            series = df.iloc[:, idx]
             null_count = int(series.isna().sum())
             non_null_samples = series.dropna().head(3).tolist()
             # Convert non-serializable objects to string representation

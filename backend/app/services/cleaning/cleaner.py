@@ -51,6 +51,20 @@ class DataCleaner:
         """
         logger.info(f"Starting data cleaning pipeline for dataset '{dataset_id}' ({filename}), shape={df.shape}")
         cleaned_df = df.copy()
+
+        # Deduplicate column names if any duplicate names exist
+        seen_cols = {}
+        unique_cols = []
+        for c in cleaned_df.columns:
+            c_str = str(c)
+            if c_str in seen_cols:
+                seen_cols[c_str] += 1
+                unique_cols.append(f"{c_str}_{seen_cols[c_str]}")
+            else:
+                seen_cols[c_str] = 0
+                unique_cols.append(c_str)
+        cleaned_df.columns = unique_cols
+
         transformations: List[str] = []
 
         orig_rows, orig_cols = df.shape
@@ -62,8 +76,9 @@ class DataCleaner:
 
         # Stage 1: Replace placeholder string values with proper np.nan
         for col in cleaned_df.columns:
-            if cleaned_df[col].dtype == object or pd.api.types.is_string_dtype(cleaned_df[col]):
-                mask = cleaned_df[col].astype(str).str.strip().str.lower().isin(cls.NULL_PLACEHOLDERS)
+            col_s = cleaned_df[col].iloc[:, 0] if isinstance(cleaned_df[col], pd.DataFrame) else cleaned_df[col]
+            if col_s.dtype == object or pd.api.types.is_string_dtype(col_s):
+                mask = col_s.astype(str).str.strip().str.lower().isin(cls.NULL_PLACEHOLDERS)
                 if mask.any():
                     count = int(mask.sum())
                     cleaned_df.loc[mask, col] = np.nan
@@ -78,16 +93,17 @@ class DataCleaner:
 
         # Stage 3: Clean numeric values (strip currency symbols, commas, percent signs)
         for col in cleaned_df.columns:
-            if cleaned_df[col].dtype == object or pd.api.types.is_string_dtype(cleaned_df[col]):
+            col_s = cleaned_df[col].iloc[:, 0] if isinstance(cleaned_df[col], pd.DataFrame) else cleaned_df[col]
+            if col_s.dtype == object or pd.api.types.is_string_dtype(col_s):
                 # Strip currency and symbols
                 candidate_s = (
-                    cleaned_df[col]
+                    col_s
                     .astype(str)
                     .str.replace(r"[\$€£¥,%\s]", "", regex=True)
                 )
                 # Test numeric conversion
                 numeric_s = pd.to_numeric(candidate_s, errors="coerce")
-                non_null_orig = cleaned_df[col].notna().sum()
+                non_null_orig = col_s.notna().sum()
                 if non_null_orig > 0 and (numeric_s.notna().sum() / non_null_orig) >= 0.5:
                     cleaned_df[col] = numeric_s
                     numeric_cleaned += 1
@@ -97,7 +113,8 @@ class DataCleaner:
         for col in cleaned_df.columns:
             if "date" in col.lower() or "time" in col.lower():
                 try:
-                    converted_dt = pd.to_datetime(cleaned_df[col], errors="coerce")
+                    col_s = cleaned_df[col].iloc[:, 0] if isinstance(cleaned_df[col], pd.DataFrame) else cleaned_df[col]
+                    converted_dt = pd.to_datetime(col_s, errors="coerce")
                     valid_dt_ratio = converted_dt.notna().mean()
                     if valid_dt_ratio > 0.4:
                         # Format as clean ISO date

@@ -33,14 +33,18 @@ class PatternDetector:
         target_df = df.copy()
 
         if time_col and time_col in target_df.columns:
-            target_df[time_col] = pd.to_datetime(target_df[time_col], errors="coerce", format="mixed")
+            raw_t = target_df[time_col]
+            t_s = raw_t.iloc[:, 0] if isinstance(raw_t, pd.DataFrame) else raw_t
+            target_df[time_col] = pd.to_datetime(t_s, errors="coerce", format="mixed")
             target_df = target_df.dropna(subset=[time_col]).sort_values(by=time_col)
 
         for n_col in num_cols[:3]:
-            if n_col not in target_df.columns:
+            if n_col not in target_df.columns or (time_col and n_col == time_col):
                 continue
 
-            s = pd.to_numeric(target_df[n_col], errors="coerce").dropna()
+            raw_n = target_df[n_col]
+            n_s = raw_n.iloc[:, 0] if isinstance(raw_n, pd.DataFrame) else raw_n
+            s = pd.to_numeric(n_s, errors="coerce").dropna()
             if len(s) < 4:
                 continue
 
@@ -102,12 +106,18 @@ class PatternDetector:
 
         for c_col in cat_cols[:2]:
             for n_col in num_cols[:2]:
-                if c_col not in df.columns or n_col not in df.columns:
+                if c_col not in df.columns or n_col not in df.columns or c_col == n_col:
                     continue
 
-                sub_df = df[[c_col, n_col]].copy()
-                sub_df[n_col] = pd.to_numeric(sub_df[n_col], errors="coerce")
-                clean_df = sub_df.dropna()
+                raw_c = df[c_col]
+                raw_n = df[n_col]
+                c_s = raw_c.iloc[:, 0] if isinstance(raw_c, pd.DataFrame) else raw_c
+                n_s = raw_n.iloc[:, 0] if isinstance(raw_n, pd.DataFrame) else raw_n
+
+                clean_df = pd.DataFrame({
+                    c_col: c_s,
+                    n_col: pd.to_numeric(n_s, errors="coerce")
+                }).dropna()
 
                 if len(clean_df) < 3:
                     continue
@@ -161,7 +171,9 @@ class PatternDetector:
             if n_col not in df.columns:
                 continue
 
-            s = pd.to_numeric(df[n_col], errors="coerce").dropna()
+            raw_n = df[n_col]
+            n_s = raw_n.iloc[:, 0] if isinstance(raw_n, pd.DataFrame) else raw_n
+            s = pd.to_numeric(n_s, errors="coerce").dropna()
             if len(s) < 5:
                 continue
 
@@ -218,19 +230,22 @@ class PatternDetector:
         if time_col not in df.columns:
             return seasonality
 
-        target_df = df.copy()
-        target_df[time_col] = pd.to_datetime(target_df[time_col], errors="coerce", format="mixed")
-        clean_df = target_df.dropna(subset=[time_col])
-
-        if len(clean_df) < 7:
-            return seasonality
-
         for n_col in num_cols[:2]:
-            if n_col not in clean_df.columns:
+            if n_col not in df.columns or n_col == time_col:
                 continue
 
-            clean_df[n_col] = pd.to_numeric(clean_df[n_col], errors="coerce")
-            valid_df = clean_df.dropna(subset=[n_col])
+            raw_t = df[time_col]
+            raw_n = df[n_col]
+            t_s = raw_t.iloc[:, 0] if isinstance(raw_t, pd.DataFrame) else raw_t
+            n_s = raw_n.iloc[:, 0] if isinstance(raw_n, pd.DataFrame) else raw_n
+
+            valid_df = pd.DataFrame({
+                time_col: pd.to_datetime(t_s, errors="coerce", format="mixed"),
+                n_col: pd.to_numeric(n_s, errors="coerce")
+            }).dropna()
+
+            if len(valid_df) < 7:
+                continue
 
             # Day of week analysis
             valid_df["day_of_week"] = valid_df[time_col].dt.day_name()
