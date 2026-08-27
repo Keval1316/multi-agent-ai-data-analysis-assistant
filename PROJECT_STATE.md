@@ -1,14 +1,14 @@
 # PROJECT STATE
 
-Last updated: 2026-08-27 11:27
+Last updated: 2026-08-27 11:41
 
 ## Current Phase
-Phase 2: Dataset profiling and quality checking (Next)
+Phase 3: LLM router and dataset understanding (Next)
 
 ## Completed Phases
 - [x] Phase 0: Repository scaffolding
 - [x] Phase 1: File upload and ingestion
-- [ ] Phase 2: Dataset profiling and quality checking
+- [x] Phase 2: Dataset profiling and quality checking
 - [ ] Phase 3: LLM router and dataset understanding
 - [ ] Phase 4: Statistical and SQL analysis
 - [ ] Phase 5: Pattern detection and visualizations
@@ -20,20 +20,15 @@ Phase 2: Dataset profiling and quality checking (Next)
 - [ ] Phase 11: Deployment and documentation
 
 ## Key Decisions and Notes
-- **File Validation & Ingestion**:
-  - `FileValidator` enforces extension checks (`.csv`, `.xlsx`, `.xls`), non-empty payloads, and maximum file size (`MAX_UPLOAD_SIZE_MB`).
-  - `DatasetLoader` implements multi-encoding fallback (`utf-8`, `utf-8-sig`, `latin-1`, `cp1252`, `iso-8859-1`) and dynamic delimiter detection (`,`, `;`, `\t`, `|`).
-  - SQL column sanitization ensures safe, unique DuckDB identifiers (`clean_name`) while preserving original header labels in `ColumnSchema` metadata.
-  - In-memory `DuckDBManager` registers pandas DataFrames as isolated tables (`dataset_<uuid>`) and provides fast preview generation.
-- **Frontend FileUpload Component**:
-  - Implemented interactive drag-and-drop zone using Framer Motion.
-  - Client-side size & extension validation with instant feedback.
-  - Displays detected schema badges, null counts, and interactive preview table of first 5 rows.
-- **Synthetic Datasets**:
-  - Created `samples/clean_dataset.csv`, `samples/clean_dataset.xlsx`, and `samples/messy_dataset.csv` (with missing values, duplicates, outliers, mixed types, inconsistent categories).
+- **Deterministic Profiling & Quality Engine**:
+  - `DatasetProfiler` computes distributions, semantic types (`numeric`, `categorical`, `datetime`, `boolean`, `identifier`), moments (mean, std, skewness), quantiles (Q1, median, Q3, IQR), and frequency distributions deterministically without LLM calls.
+  - `QualityChecker` audits completeness, uniqueness, and consistency, classifying findings into `confirmed_issue` (deduplication needed, empty columns, negative domain values), `suspicious_issue` (extreme outliers >3.0*IQR, inconsistent categorical casing/abbreviations), and `informational` (mild IQR tail values, high cardinality identifiers).
+  - Overall quality score calculated on a 0-100 scale with Grade assigned (A: >=90, B: 80-89, C: 70-79, D: 60-69, F: <60).
+- **Frontend Quality Inspection**:
+  - `DatasetProfileView` displays score gauge, severity counters, issue remedies, column schemas, and interactive frequency distributions.
 
 ## Known Issues / Limitations
-- In-memory DuckDB tables are ephemeral and tied to the active server process.
+- None in Phase 2.
 
 ## Environment Variables Required
 - `APP_ENV`: Application environment (development/production) [Backend]
@@ -48,25 +43,19 @@ Phase 2: Dataset profiling and quality checking (Next)
 - `VITE_API_BASE_URL`: Base backend URL (http://localhost:8000) [Frontend]
 
 ## Test Status
-- Backend test suite (`backend/tests/`): 14 passed in 3.71s (`test_health.py` and `test_ingestion.py`).
-- Frontend production bundle (`npm run build`): Clean build in 13.7s.
+- Backend test suite (`backend/tests/`): 19 passed in 4.41s (`test_health.py`, `test_ingestion.py`, `test_profiling.py`, `test_quality.py`).
+- Frontend production bundle (`npm run build`): Clean build in 11.45s.
 
 ## Next Phase Plan
-- **Phase 2: Dataset Profiling and Quality Checking**
-  - Implement deterministic profiler (`backend/app/services/profiling/profiler.py`):
-    * Row count, column count, data types, null counts and null percentages.
-    * Duplicate row counts and percentages.
-    * Cardinality, unique value counts, top frequent values for categorical columns.
-    * Statistical summaries (min, max, mean, median, std, quantiles) for numerical columns.
-    * Identifier / primary key candidate detection.
-  - Implement deterministic data quality checker (`backend/app/services/quality/checker.py`):
-    * Missing value severity assessment.
-    * Duplicate row detection.
-    * Type mismatch & mixed type heuristics.
-    * Numerical outlier detection using IQR and Z-scores.
-    * Inconsistent categorical labels detection (case variations, extra spaces, abbreviations).
-    * Quality classification: Confirmed issue, Suspicious issue, Informational observation.
-    * Overall data quality score (0 - 100%).
-  - Create Pydantic models for profile and quality report (`backend/app/models/profile.py`, `quality.py`).
-  - Implement API endpoint (`POST /api/profile/{dataset_id}` and `POST /api/quality/{dataset_id}`).
-  - Add comprehensive unit tests on both `clean_dataset.csv` and `messy_dataset.csv`.
+- **Phase 3: LLM Router and Dataset Understanding**
+  - Implement resilient LLM provider abstraction (`backend/app/llm/`):
+    * Provider interface, Groq provider (`groq`), Gemini provider (`google-genai`), Mock provider for isolated testing.
+    * Multi-credential configuration and round-robin/least-loaded selection.
+    * Health tracking, rate-limit cooldown, retries, and automatic failover.
+    * Structured output validation against Pydantic models with one correction retry.
+  - Implement Dataset Understanding Agent (`backend/app/agents/understand_dataset.py`):
+    * Ingests compact profile and quality metadata (never full raw dataset).
+    * Infers dataset domain, business context, key candidate KPIs, potential relationships, and primary analytical questions.
+  - Implement Analysis Planning Agent (`backend/app/agents/plan_analysis.py`):
+    * Formulates structured analysis plan referencing strictly validated columns.
+  - Comprehensive unit and mock tests for provider failover, rate limits, invalid JSON recovery, and agent outputs.

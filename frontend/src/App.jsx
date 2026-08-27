@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Sparkles, Activity, ShieldCheck, Database, Cpu } from 'lucide-react';
+import { Sparkles, ShieldCheck, Database, Cpu, RefreshCw } from 'lucide-react';
 import FileUpload from './components/FileUpload';
+import DatasetProfileView from './components/DatasetProfileView';
 
 export default function App() {
   const [health, setHealth] = useState(null);
@@ -43,7 +44,17 @@ export default function App() {
             </div>
           </div>
 
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-3">
+            {activeDataset && (
+              <button
+                onClick={() => setActiveDataset(null)}
+                className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-surface border border-border text-text-secondary hover:text-text-primary hover:bg-surface-accent/20 transition-colors"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span>Upload New File</span>
+              </button>
+            )}
+
             <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-surface border border-border text-text-secondary">
               <span className={`w-2 h-2 rounded-full mr-2 ${health?.status === 'healthy' ? 'bg-primary animate-pulse' : 'bg-red-500'}`} />
               {loading ? 'Checking Engine...' : health?.status === 'healthy' ? 'Engine Ready' : 'Backend Offline'}
@@ -53,62 +64,86 @@ export default function App() {
       </header>
 
       {/* Main Container */}
-      <main className="max-w-7xl mx-auto px-6 py-12 flex-1 w-full space-y-12">
-        {/* Hero Section */}
-        <div className="text-center max-w-3xl mx-auto">
-          <div className="inline-flex items-center space-x-2 px-3.5 py-1.5 rounded-full bg-surface border border-border text-xs font-semibold text-text-secondary mb-4 shadow-sm">
-            <Cpu className="w-4 h-4 text-primary" />
-            <span>Multi-Agent Ingestion Engine</span>
-          </div>
-          <h2 className="text-4xl font-extrabold tracking-tight text-text-primary mb-4 sm:text-5xl">
-            Analyze Complex Data with Multi-Agent Precision
-          </h2>
-          <p className="text-base sm:text-lg text-text-secondary leading-relaxed max-w-2xl mx-auto">
-            Upload any messy CSV or Excel dataset. Our deterministic engine validates structure and loads it into DuckDB before orchestrating multi-agent insights.
-          </p>
-        </div>
-
-        {/* Upload Component */}
-        <FileUpload onDatasetIngested={(metadata) => setActiveDataset(metadata)} />
-
-        {/* Feature Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-6">
-          <div className="p-6 rounded-3xl bg-surface border border-border shadow-sm">
-            <div className="w-12 h-12 rounded-2xl bg-surface-accent/30 border border-border flex items-center justify-center mb-4">
-              <Database className="w-6 h-6 text-primary" />
+      <main className="max-w-7xl mx-auto px-6 py-10 flex-1 w-full space-y-10">
+        {!activeDataset ? (
+          <>
+            {/* Hero Section */}
+            <div className="text-center max-w-3xl mx-auto">
+              <div className="inline-flex items-center space-x-2 px-3.5 py-1.5 rounded-full bg-surface border border-border text-xs font-semibold text-text-secondary mb-4 shadow-sm">
+                <Cpu className="w-4 h-4 text-primary" />
+                <span>Phase 2 • Automated Profiling & Quality Audit</span>
+              </div>
+              <h2 className="text-4xl font-extrabold tracking-tight text-text-primary mb-4 sm:text-5xl">
+                Analyze Complex Data with Multi-Agent Precision
+              </h2>
+              <p className="text-base sm:text-lg text-text-secondary leading-relaxed max-w-2xl mx-auto">
+                Upload any messy CSV or Excel dataset. Our deterministic engine profiles structure, audits quality, and detects statistical anomalies in real-time.
+              </p>
             </div>
-            <h3 className="text-base font-bold text-text-primary mb-2">Deterministic DuckDB Ingestion</h3>
-            <p className="text-xs text-text-secondary leading-relaxed">
-              Auto-detects CSV encodings (UTF-8, Latin-1, CP1252), delimiters, and parses Excel spreadsheets directly into memory without hallucination.
-            </p>
-          </div>
 
-          <div className="p-6 rounded-3xl bg-surface border border-border shadow-sm">
-            <div className="w-12 h-12 rounded-2xl bg-surface-accent/30 border border-border flex items-center justify-center mb-4">
-              <ShieldCheck className="w-6 h-6 text-primary" />
-            </div>
-            <h3 className="text-base font-bold text-text-primary mb-2">Data Privacy & Security</h3>
-            <p className="text-xs text-text-secondary leading-relaxed">
-              Enforces strict size, row, and column limits. Sanitizes SQL column names and prevents formula or script injection.
-            </p>
-          </div>
+            {/* Upload Component */}
+            <FileUpload onDatasetIngested={(metadata) => setActiveDataset(metadata)} />
 
-          <div className="p-6 rounded-3xl bg-surface border border-border shadow-sm">
-            <div className="w-12 h-12 rounded-2xl bg-surface-accent/30 border border-border flex items-center justify-center mb-4">
-              <Activity className="w-6 h-6 text-primary" />
+            {/* Feature Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4">
+              <div className="p-6 rounded-3xl bg-surface border border-border shadow-sm">
+                <div className="w-12 h-12 rounded-2xl bg-surface-accent/30 border border-border flex items-center justify-center mb-4">
+                  <Database className="w-6 h-6 text-primary" />
+                </div>
+                <h3 className="text-base font-bold text-text-primary mb-2">Deterministic Profiling</h3>
+                <p className="text-xs text-text-secondary leading-relaxed">
+                  Computes quantiles, IQR, variance, categorical frequencies, and primary key candidates without hallucinating numbers.
+                </p>
+              </div>
+
+              <div className="p-6 rounded-3xl bg-surface border border-border shadow-sm">
+                <div className="w-12 h-12 rounded-2xl bg-surface-accent/30 border border-border flex items-center justify-center mb-4">
+                  <ShieldCheck className="w-6 h-6 text-primary" />
+                </div>
+                <h3 className="text-base font-bold text-text-primary mb-2">Comprehensive Quality Audit</h3>
+                <p className="text-xs text-text-secondary leading-relaxed">
+                  Detects duplicates, statistical outliers, inconsistent category labels, negative anomalies, and scores datasets on a 0-100 scale.
+                </p>
+              </div>
+
+              <div className="p-6 rounded-3xl bg-surface border border-border shadow-sm">
+                <div className="w-12 h-12 rounded-2xl bg-surface-accent/30 border border-border flex items-center justify-center mb-4">
+                  <Sparkles className="w-6 h-6 text-primary" />
+                </div>
+                <h3 className="text-base font-bold text-text-primary mb-2">Multi-Agent Ready</h3>
+                <p className="text-xs text-text-secondary leading-relaxed">
+                  Generates compact, safe statistical representations to ground downstream LLM agents with zero data leak risks.
+                </p>
+              </div>
             </div>
-            <h3 className="text-base font-bold text-text-primary mb-2">Multi-Agent Pipeline</h3>
-            <p className="text-xs text-text-secondary leading-relaxed">
-              Profiles dataset quality, formulates statistical tests, executes analytical SQL, and validates insights through a Critic loop.
-            </p>
+          </>
+        ) : (
+          <div className="space-y-8">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-bold text-text-primary tracking-tight">
+                  Dataset Structure & Quality Inspection
+                </h2>
+                <p className="text-xs text-text-secondary mt-0.5">
+                  Inspecting active table <span className="font-mono font-semibold">{activeDataset.table_name}</span> ({activeDataset.filename})
+                </p>
+              </div>
+            </div>
+
+            <DatasetProfileView
+              datasetId={activeDataset.dataset_id}
+              onProceedToAnalysis={() => {
+                alert(`Proceeding to multi-agent analysis for dataset ${activeDataset.dataset_id}`);
+              }}
+            />
           </div>
-        </div>
+        )}
       </main>
 
       {/* Footer */}
       <footer className="border-t border-border bg-surface/50 py-6">
         <div className="max-w-7xl mx-auto px-6 text-center text-xs text-text-secondary">
-          Multi-Agent Data Analyst • Phase 1 Ingestion Pipeline
+          Multi-Agent Data Analyst • Phase 2 Dataset Profiling & Quality Engine
         </div>
       </footer>
     </div>
