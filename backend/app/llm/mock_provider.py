@@ -256,6 +256,36 @@ class MockLLMProvider(LLMProvider):
                 severity_of_discrepancy="None"
             )  # type: ignore
 
+        # 6. GeneratedReportMarkdown
+        from backend.app.models.report import GeneratedReportMarkdown
+        if response_model == GeneratedReportMarkdown:
+            return GeneratedReportMarkdown(
+                title="Commercial & Operational Dataset Analysis Report",
+                subtitle="Executive Insights, Statistical Distributions, SQL Discoveries & Strategic Recommendations",
+                executive_summary=(
+                    "This comprehensive analytical report evaluates the uploaded dataset structure, statistical properties, "
+                    "and operational dimensions. Our multi-agent pipeline processed the dataset across profiling, quality auditing, "
+                    "deterministic statistical modeling, SQL execution, pattern detection, and adversarial insight verification."
+                ),
+                key_findings_markdown=(
+                    "### 1. Revenue Concentration & Product Performance\n"
+                    "- Commercial transaction volume shows pronounced category concentration.\n"
+                    "- Leading product categories generate the primary share of total gross revenue.\n\n"
+                    "### 2. Statistical Distribution & Outlier Behavior\n"
+                    "- Transaction distributions exhibit positive skewness, with the mean order value exceeding the median.\n"
+                    "- Extreme value anomalies were isolated and verified for audit integrity."
+                ),
+                strategic_recommendations_markdown=(
+                    "1. **Inventory & Promotion Optimization**: Prioritize high-performing categories for inventory stocking.\n"
+                    "2. **Order Tiering & Upselling**: Introduce structured loyalty programs to boost average order value.\n"
+                    "3. **Data Quality Governance**: Deploy point-of-entry validation to prevent anomalous transaction inputs."
+                ),
+                methodology_and_caveats_markdown=(
+                    "Analysis was conducted using deterministic computation (DuckDB SQL, SciPy moments, Pearson/Spearman correlations) "
+                    "combined with evidence-grounded AI synthesis. Caveats: Group differences reflect observed historical records."
+                )
+            )  # type: ignore
+
         # Generic fallback using response model defaults or empty construction
         try:
             return response_model()

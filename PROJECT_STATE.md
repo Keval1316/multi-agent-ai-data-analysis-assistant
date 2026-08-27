@@ -1,9 +1,9 @@
 # PROJECT STATE
 
-Last updated: 2026-08-27 12:03
+Last updated: 2026-08-27 12:07
 
 ## Current Phase
-Phase 7: Report generation and PDF export (Next)
+Phase 8: Full LangGraph orchestration and SSE (Next)
 
 ## Completed Phases
 - [x] Phase 0: Repository scaffolding
@@ -13,20 +13,21 @@ Phase 7: Report generation and PDF export (Next)
 - [x] Phase 4: Statistical and SQL analysis
 - [x] Phase 5: Pattern detection and visualizations
 - [x] Phase 6: Insight generation and critic loop
-- [ ] Phase 7: Report generation and PDF export
+- [x] Phase 7: Report generation and PDF export
 - [ ] Phase 8: Full LangGraph orchestration and SSE
 - [ ] Phase 9: Complete frontend workflow
 - [ ] Phase 10: End-to-end testing
 - [ ] Phase 11: Deployment and documentation
 
 ## Key Decisions and Notes
-- **Evidence-Grounded Insight Generation & Critic Loop**:
-  - `InsightGenerationAgent` converts computed moments, quantiles, correlation significance, SQL query results, and patterns into structured `InsightCollection`. Replaces unproven causal assertions with associative/suggestive language.
-  - `CriticReviewAgent` adversarially validates each insight against the computed tables. Rejects fabricated or hallucinated figures with concrete `unsupported_claims` and `required_corrections`.
-  - `InsightRevisionOrchestrator` manages the revision cycle with a strict hard cap of 2 loops. If unverified claims persist after 2 iterations, the claims are downgraded to "Caveat" status with explicit data limitation notices.
+- **Report Generation & ReportLab PDF Exporter**:
+  - `ReportGenerationAgent` structures the full analytical findings into an executive report with detailed markdown sections.
+  - `PDFExporter` uses `reportlab.platypus` with `NumberedCanvas` to compile publication-ready PDFs conforming strictly to brand design tokens (`#40513B`, `#609966`, `#9DC08B`, `#EDF1D6`, `#FFFFFF`).
+  - Endpoints `GET /api/dataset/{dataset_id}/report` and `GET /api/dataset/{dataset_id}/report/pdf` provide instant report retrieval and streaming attachment downloads.
+  - `ReportView.jsx` provides interactive markdown rendering with integrated Plotly charts, insight cards, and one-click PDF download.
 
 ## Known Issues / Limitations
-- None in Phase 6.
+- None in Phase 7.
 
 ## Environment Variables Required
 - `APP_ENV`: Application environment (development/production) [Backend]
@@ -41,16 +42,30 @@ Phase 7: Report generation and PDF export (Next)
 - `VITE_API_BASE_URL`: Base backend URL (http://localhost:8000) [Frontend]
 
 ## Test Status
-- Backend test suite (`backend/tests/`): 43 passed in 3.01s (`test_health.py`, `test_ingestion.py`, `test_profiling.py`, `test_quality.py`, `test_llm_router.py`, `test_agents.py`, `test_statistics.py`, `test_sql_safety.py`, `test_sql_execution.py`, `test_patterns.py`, `test_visualizations.py`, `test_insights.py`, `test_critic.py`, `test_revision_loop.py`).
-- Frontend production bundle (`npm run build`): Clean build in 2.47s.
+- Backend test suite (`backend/tests/`): 47 passed in 3.42s (`test_health.py`, `test_ingestion.py`, `test_profiling.py`, `test_quality.py`, `test_llm_router.py`, `test_agents.py`, `test_statistics.py`, `test_sql_safety.py`, `test_sql_execution.py`, `test_patterns.py`, `test_visualizations.py`, `test_insights.py`, `test_critic.py`, `test_revision_loop.py`, `test_report.py`, `test_pdf_export.py`).
+- Frontend production bundle (`npm run build`): Clean build in 3.04s.
 
 ## Next Phase Plan
-- **Phase 7: Report Generation and PDF Export**
-  - Implement Report Synthesis Agent (`backend/app/agents/generate_report.py`):
-    * Generates cohesive markdown analysis report with executive summary, methodology, key findings, strategic recommendations, and data quality caveats.
-    * Injects interactive chart references and SQL findings.
-  - Implement PDF Exporter Service (`backend/app/services/reporting/pdf_exporter.py`):
-    * Uses `reportlab` to render a pixel-perfect, professionally styled multi-page PDF matching the project's color palette (`#40513B`, `#609966`, `#9DC08B`, `#EDF1D6`).
-    * Includes cover header, KPI grid, quality scorecard, insight tables, charts (rasterized via kaleido or SVG/PNG), and recommendations.
-  - Add API endpoints `GET /api/dataset/{dataset_id}/report` and `GET /api/dataset/{dataset_id}/report/pdf`.
-  - Add unit tests for report generation and PDF generation.
+- **Phase 8: Full LangGraph Orchestration and SSE**
+  - Implement Typed `AnalysisWorkflowState` (`backend/app/orchestration/state.py`) capturing all 17 multi-agent nodes.
+  - Implement full 17-node LangGraph StateGraph (`backend/app/orchestration/graph.py`):
+    * Node 1: `validate_file`
+    * Node 2: `load_dataset`
+    * Node 3: `profile_and_audit`
+    * Node 4: `understand_dataset`
+    * Node 5: `plan_analysis`
+    * Node 6: `run_statistical_analysis`
+    * Node 7: `generate_sql`
+    * Node 8: `validate_sql`
+    * Node 9: `execute_sql`
+    * Node 10: `detect_patterns`
+    * Node 11: `select_visualizations`
+    * Node 12: `render_charts`
+    * Node 13: `generate_insights`
+    * Node 14: `critic_review`
+    * Node 15: `revise_insights` (conditional routing edge based on `critic_approved` with max 2 loop guard)
+    * Node 16: `generate_report`
+    * Node 17: `render_pdf`
+  - Implement Server-Sent Events (SSE) Streaming Endpoint (`POST /api/analyze/stream` and `GET /api/dataset/{dataset_id}/stream`):
+    * Streams granular agent progress events with step name, status, elapsed time, and payload snapshots.
+  - Add comprehensive unit and integration tests for full graph execution and SSE streaming.

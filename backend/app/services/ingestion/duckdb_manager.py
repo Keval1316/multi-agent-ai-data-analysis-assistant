@@ -63,6 +63,10 @@ class DuckDBManager:
             logger.error(f"Failed to fetch preview rows for table '{table_name}': {str(e)}")
             return []
 
+    def get_dataframe(self, table_name: str) -> pd.DataFrame:
+        """Retrieves an entire table as a pandas DataFrame."""
+        return self.conn.execute(f"SELECT * FROM {table_name}").df()
+
     def execute_query(self, query: str) -> pd.DataFrame:
         """Executes a SQL query against the DuckDB instance and returns a pandas DataFrame."""
         return self.conn.execute(query).df()

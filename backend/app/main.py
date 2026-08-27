@@ -8,6 +8,7 @@ from backend.app.core.exceptions import AppBaseException
 from backend.app.api.routes.health import router as health_router
 from backend.app.api.routes.upload import router as upload_router
 from backend.app.api.routes.profile import router as profile_router
+from backend.app.api.routes.report import router as report_router
 
 
 @asynccontextmanager
@@ -57,6 +58,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 app.include_router(health_router)
 app.include_router(upload_router)
 app.include_router(profile_router)
+app.include_router(report_router)
 
 
 @app.get("/")
