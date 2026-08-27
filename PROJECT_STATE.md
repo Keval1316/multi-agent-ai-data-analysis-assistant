@@ -1,9 +1,9 @@
 # PROJECT STATE
 
-Last updated: 2026-08-27 11:59
+Last updated: 2026-08-27 12:03
 
 ## Current Phase
-Phase 6: Insight generation and critic loop (Next)
+Phase 7: Report generation and PDF export (Next)
 
 ## Completed Phases
 - [x] Phase 0: Repository scaffolding
@@ -12,7 +12,7 @@ Phase 6: Insight generation and critic loop (Next)
 - [x] Phase 3: LLM router and dataset understanding
 - [x] Phase 4: Statistical and SQL analysis
 - [x] Phase 5: Pattern detection and visualizations
-- [ ] Phase 6: Insight generation and critic loop
+- [x] Phase 6: Insight generation and critic loop
 - [ ] Phase 7: Report generation and PDF export
 - [ ] Phase 8: Full LangGraph orchestration and SSE
 - [ ] Phase 9: Complete frontend workflow
@@ -20,14 +20,13 @@ Phase 6: Insight generation and critic loop (Next)
 - [ ] Phase 11: Deployment and documentation
 
 ## Key Decisions and Notes
-- **Pattern & Anomaly Detection**:
-  - `PatternDetector` executes deterministic linear regression trends (`slope`, `r_squared`, growth rates, p-values), Pareto concentration analysis (measuring category dominance), z-score / IQR multi-metric anomaly detection, and day-of-week seasonality cycles.
-- **Interactive Visualization Engine**:
-  - `ChartGenerator` produces rich, interactive Plotly JSON specs (bar, line, scatter, donut) styled with the exact requested color palette (`#EDF1D6`, `#40513B`, `#609966`, `#9DC08B`, `#FFFFFF`).
-  - `ChartRenderer` provides responsive client-side rendering with tooltips and interactive hover states.
+- **Evidence-Grounded Insight Generation & Critic Loop**:
+  - `InsightGenerationAgent` converts computed moments, quantiles, correlation significance, SQL query results, and patterns into structured `InsightCollection`. Replaces unproven causal assertions with associative/suggestive language.
+  - `CriticReviewAgent` adversarially validates each insight against the computed tables. Rejects fabricated or hallucinated figures with concrete `unsupported_claims` and `required_corrections`.
+  - `InsightRevisionOrchestrator` manages the revision cycle with a strict hard cap of 2 loops. If unverified claims persist after 2 iterations, the claims are downgraded to "Caveat" status with explicit data limitation notices.
 
 ## Known Issues / Limitations
-- None in Phase 5.
+- None in Phase 6.
 
 ## Environment Variables Required
 - `APP_ENV`: Application environment (development/production) [Backend]
@@ -42,20 +41,16 @@ Phase 6: Insight generation and critic loop (Next)
 - `VITE_API_BASE_URL`: Base backend URL (http://localhost:8000) [Frontend]
 
 ## Test Status
-- Backend test suite (`backend/tests/`): 39 passed in 2.63s (`test_health.py`, `test_ingestion.py`, `test_profiling.py`, `test_quality.py`, `test_llm_router.py`, `test_agents.py`, `test_statistics.py`, `test_sql_safety.py`, `test_sql_execution.py`, `test_patterns.py`, `test_visualizations.py`).
-- Frontend production bundle (`npm run build`): Clean build in 2.55s.
+- Backend test suite (`backend/tests/`): 43 passed in 3.01s (`test_health.py`, `test_ingestion.py`, `test_profiling.py`, `test_quality.py`, `test_llm_router.py`, `test_agents.py`, `test_statistics.py`, `test_sql_safety.py`, `test_sql_execution.py`, `test_patterns.py`, `test_visualizations.py`, `test_insights.py`, `test_critic.py`, `test_revision_loop.py`).
+- Frontend production bundle (`npm run build`): Clean build in 2.47s.
 
 ## Next Phase Plan
-- **Phase 6: Insight Generation and Critic Loop**
-  - Implement Insight Generation Agent (`backend/app/agents/generate_insights.py`):
-    * Generates evidence-grounded findings referencing only computed statistics, SQL results, and patterns
-    * Avoids causal claims without proof ("is associated with", "may indicate", "suggests")
-    * Pydantic model `InsightCollection` (`InsightItem`: finding, supporting_evidence, importance, confidence, recommendation)
-  - Implement Critic Review Agent (`backend/app/agents/critic_review.py`):
-    * Audits generated insights against ground-truth statistical numbers and SQL tables
-    * Detects hallucinated numbers, unsupported claims, overstated causation
-    * Pydantic model `CriticReviewResult` (approved: bool, feedback, unsupported_claims, required_corrections)
-  - Implement Insight Revision Loop (`backend/app/agents/revise_insights.py`):
-    * Condition-based revision with a strict cap of maximum 2 revision loops
-    * Preserves supported insights and attaches internal/user caveats if revision limit reached
-  - Add comprehensive unit and mock tests for supported, unsupported, and revision loop handling.
+- **Phase 7: Report Generation and PDF Export**
+  - Implement Report Synthesis Agent (`backend/app/agents/generate_report.py`):
+    * Generates cohesive markdown analysis report with executive summary, methodology, key findings, strategic recommendations, and data quality caveats.
+    * Injects interactive chart references and SQL findings.
+  - Implement PDF Exporter Service (`backend/app/services/reporting/pdf_exporter.py`):
+    * Uses `reportlab` to render a pixel-perfect, professionally styled multi-page PDF matching the project's color palette (`#40513B`, `#609966`, `#9DC08B`, `#EDF1D6`).
+    * Includes cover header, KPI grid, quality scorecard, insight tables, charts (rasterized via kaleido or SVG/PNG), and recommendations.
+  - Add API endpoints `GET /api/dataset/{dataset_id}/report` and `GET /api/dataset/{dataset_id}/report/pdf`.
+  - Add unit tests for report generation and PDF generation.

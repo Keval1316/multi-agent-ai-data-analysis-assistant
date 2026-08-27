@@ -170,6 +170,92 @@ class MockLLMProvider(LLMProvider):
             ]
             return SQLGenerationResponse(queries=queries)  # type: ignore
 
+        # 4. InsightCollection
+        from backend.app.models.insights import InsightCollection, InsightItem
+        if response_model == InsightCollection:
+            dataset_id = "dataset"
+            id_match = re.search(r"dataset[\s_]*id[:\s]+['\"]?([a-zA-Z0-9_]+)['\"]?", prompt_text, re.IGNORECASE)
+            if id_match:
+                dataset_id = id_match.group(1)
+
+            insights = [
+                InsightItem(
+                    id="ins_1",
+                    title="Category Revenue Concentration",
+                    finding="Commercial performance is heavily concentrated in top product lines, with leading categories generating the majority of overall revenue volume.",
+                    supporting_evidence="Top category represents the largest single segment share according to computed group aggregations.",
+                    importance="High",
+                    confidence="High",
+                    recommendation="Focus inventory allocation and promotional campaigns on high-performing product segments.",
+                    category="Revenue Driver"
+                ),
+                InsightItem(
+                    id="ins_2",
+                    title="Volume and Pricing Distribution",
+                    finding="Transaction sizes indicate a steady baseline of routine purchases alongside high-value premium orders.",
+                    supporting_evidence="Univariate statistics show mean revenue exceeds the median, reflecting an upward-skewed transaction distribution.",
+                    importance="Medium",
+                    confidence="High",
+                    recommendation="Implement tiered loyalty incentives to encourage upselling on baseline orders.",
+                    category="Performance"
+                ),
+                InsightItem(
+                    id="ins_3",
+                    title="Outlier and Operational Integrity",
+                    finding="Identified isolated anomalies that deviate significantly from standard transaction parameters.",
+                    supporting_evidence="Statistical Z-scores and IQR detection flagged values outside standard boundaries.",
+                    importance="Medium",
+                    confidence="Medium",
+                    recommendation="Establish automated validation rules to flag extreme transaction values at point of entry.",
+                    category="Operational Risk"
+                )
+            ]
+
+            summary_points = [
+                "Strong concentration in core product categories driving top-line revenue.",
+                "Right-skewed order value distribution with significant premium order opportunities.",
+                "Targeted operational audits recommended for extreme outlier transactions."
+            ]
+
+            return InsightCollection(
+                dataset_id=dataset_id,
+                insights=insights,
+                executive_summary_points=summary_points,
+                overall_confidence_rating="High"
+            )  # type: ignore
+
+        # 5. CriticReviewResult
+        from backend.app.models.critic import CriticReviewResult, UnsupportedClaim
+        if response_model == CriticReviewResult:
+            user_msg = "\n".join([m["content"] for m in messages if m.get("role") == "user"])
+            is_reject = "ins_fake" in user_msg or "9999%" in user_msg or "fabricated profit" in user_msg.lower()
+
+            if is_reject:
+                return CriticReviewResult(
+                    approved=False,
+                    feedback="Detected unsupported numerical claims and overgeneralized assertions not backed by computed statistics.",
+                    unsupported_claims=[
+                        UnsupportedClaim(
+                            insight_id="ins_fake",
+                            claim_text="Revenue grew by 9999% without baseline data",
+                            reason="Fabricated percentage not present in computed statistical results",
+                            ground_truth_fact="Actual growth rate is within standard bounds"
+                        )
+                    ],
+                    required_corrections=[
+                        "Remove the unsupported 9999% growth claim and reference only validated group totals."
+                    ],
+                    severity_of_discrepancy="Critical"
+                )  # type: ignore
+
+            return CriticReviewResult(
+                approved=True,
+                feedback="All insight findings are rigorously grounded in computed statistical moments, SQL results, and pattern metrics. Causal language is appropriately moderated.",
+                unsupported_claims=[],
+                required_corrections=[],
+                severity_of_discrepancy="None"
+            )  # type: ignore
+
         # Generic fallback using response model defaults or empty construction
         try:
             return response_model()
