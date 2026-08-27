@@ -17,10 +17,11 @@ class DimensionCandidate(BaseModel):
 
 
 class DatasetUnderstanding(BaseModel):
-    domain: str = Field(..., description="Business or operational domain (e.g. 'E-Commerce Retail')")
+    domain: str = Field(..., description="Business or operational domain (e.g. 'Healthcare', 'Finance', 'Workforce', 'Sales')")
     dataset_summary: str = Field(..., description="Concise narrative summary of the dataset content")
-    target_entity: str = Field(..., description="Primary entity recorded (e.g. 'Sales Transaction')")
+    target_entity: str = Field(..., description="Primary entity recorded (e.g. 'Patient Record', 'Employee Profile', 'Transaction')")
     key_kpis: List[KPICandidate] = Field(..., min_length=1, description="Candidate KPIs and analytical metrics")
     important_dimensions: List[DimensionCandidate] = Field(..., min_length=1, description="Dimensions for grouping/segmentation")
-    core_questions: List[str] = Field(..., min_length=2, description="3-5 core business questions to answer")
+    core_questions: Optional[List[str]] = Field(default_factory=list, description="Initial scoping vectors prior to empirical data modeling")
     data_limitations_note: Optional[str] = Field(None, description="Caveats regarding missingness or data quality")
+

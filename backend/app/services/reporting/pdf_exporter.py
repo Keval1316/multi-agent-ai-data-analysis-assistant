@@ -211,16 +211,19 @@ class PDFExporter:
         story.append(Spacer(1, 14))
 
         # 3. Verified Insights & Strategic Recommendations
-        story.append(Paragraph("Verified Evidence-Grounded Insights", h1_style))
+        story.append(Paragraph("Verified Evidence-Grounded Insights & Questions Resolved", h1_style))
         for ins in report.insights.insights:
+            q_text = ins.question_answered or f"What key empirical pattern is revealed regarding {ins.category} in {ins.title}?"
             card_content = [
                 Paragraph(f"<b>{ins.title}</b> <font color='#AD8B73'>({ins.category} • {ins.importance} Priority)</font>", h2_style),
-                Paragraph(f"<b>Finding:</b> {ins.finding}", body_style),
+                Paragraph(f"<b>Investigated Question:</b> <i>{q_text}</i>", meta_style),
+                Spacer(1, 2),
+                Paragraph(f"<b>Finding & Empirical Answer:</b> {ins.finding}", body_style),
                 Paragraph(f"<b>Supporting Evidence:</b> {ins.supporting_evidence}", meta_style),
             ]
             if ins.recommendation:
                 card_content.append(Spacer(1, 3))
-                card_content.append(Paragraph(f"<b>Recommendation:</b> {ins.recommendation}", body_style))
+                card_content.append(Paragraph(f"<b>Strategic Recommendation:</b> {ins.recommendation}", body_style))
 
             ins_table = Table([[card_content]], colWidths=[532])
             ins_table.setStyle(TableStyle([

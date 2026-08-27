@@ -25,36 +25,73 @@ class MockLLMProvider(LLMProvider):
         temperature: float = 0.1,
     ) -> T:
         prompt_text = " ".join([m.get("content", "") for m in messages])
+        prompt_lower = prompt_text.lower()
+
+        # Dynamic Domain & Entity Detection
+        if any(k in prompt_lower for k in ["patient", "diagnosis", "blood", "heart", "clinical", "disease", "treatment", "glucose", "bp", "symptom"]):
+            domain = "Healthcare & Clinical Outcomes"
+            entity = "Patient Case"
+        elif any(k in prompt_lower for k in ["employee", "salary", "tenure", "department", "attrition", "hire", "performance_rating", "staff", "hr"]):
+            domain = "Human Resources & Workforce Analytics"
+            entity = "Employee Profile"
+        elif any(k in prompt_lower for k in ["student", "grade", "exam", "gpa", "course", "attendance", "teacher", "academic", "score"]):
+            domain = "Education & Academic Performance"
+            entity = "Student Record"
+        elif any(k in prompt_lower for k in ["shipment", "delivery", "warehouse", "vehicle", "freight", "logistics", "carrier", "route"]):
+            domain = "Supply Chain & Logistics"
+            entity = "Logistics Shipment"
+        elif any(k in prompt_lower for k in ["credit", "debit", "balance", "loan", "interest", "stock", "portfolio", "banking", "asset", "investment"]):
+            domain = "Financial Services & Banking"
+            entity = "Financial Account"
+        elif any(k in prompt_lower for k in ["revenue", "order", "product", "discount", "sale", "store", "customer", "retail", "cart", "unit_price"]):
+            domain = "Sales & Commercial Operations"
+            entity = "Sales Transaction"
+        else:
+            domain = "Quantitative Multi-Variable Analysis"
+            entity = "Data Record"
+
+        # Extract column metadata from prompt
+        col_matches = re.findall(r"-\s*'([^']+)'\s*\(([^,]+),\s*([^)]+)\)", prompt_text)
+        if col_matches:
+            numeric_cols = [c[0] for c in col_matches if any(t in c[1].lower() or t in c[2].lower() for t in ["numeric", "int", "float", "double", "decimal", "moment"])]
+            cat_cols = [c[0] for c in col_matches if any(t in c[1].lower() or t in c[2].lower() for t in ["categorical", "string", "object", "text", "segment"])]
+        else:
+            all_cols = re.findall(r"['\"]([a-zA-Z0-9_]+)['\"]", prompt_text)
+            numeric_cols = [c for c in all_cols if any(k in c.lower() for k in ["revenue", "price", "quantity", "cost", "score", "rate", "amount", "age", "salary", "value", "total", "count", "metric", "weight", "height", "duration", "hours", "points", "gpa"])]
+            cat_cols = [c for c in all_cols if c not in numeric_cols and any(k in c.lower() for k in ["region", "category", "product", "status", "country", "segment", "type", "dept", "department", "grade", "role", "gender", "class", "name", "city", "state"])]
+            if not numeric_cols and all_cols:
+                numeric_cols = [all_cols[0]]
+            if not cat_cols and len(all_cols) > 1:
+                cat_cols = [all_cols[1]]
+
+        primary_num = numeric_cols[0] if numeric_cols else "primary_metric"
+        secondary_num = numeric_cols[1] if len(numeric_cols) > 1 else primary_num
+        primary_cat = cat_cols[0] if cat_cols else "segment_category"
 
         # 1. DatasetUnderstanding
         if response_model == DatasetUnderstanding:
-            # Extract column names if present in prompt
-            cols = re.findall(r"['\"]([a-zA-Z0-9_]+)['\"]", prompt_text)
-            numeric_cols = [c for c in cols if any(k in c.lower() for k in ["revenue", "price", "quantity", "cost", "score", "rate", "amount"])]
-            cat_cols = [c for c in cols if any(k in c.lower() for k in ["region", "category", "product", "status", "country", "segment", "type"])]
-
             kpis = []
             if numeric_cols:
-                for col in numeric_cols[:3]:
+                for col in numeric_cols[:4]:
                     kpis.append(KPICandidate(
                         name=f"Total {col.replace('_', ' ').title()}",
                         column_name=col,
-                        aggregation="SUM" if "rate" not in col else "AVG",
-                        description=f"Aggregate tracking of {col}",
+                        aggregation="SUM" if "rate" not in col and "score" not in col and "age" not in col else "AVG",
+                        description=f"Aggregate tracking and moment distribution of {col}",
                         importance="High"
                     ))
             else:
                 kpis.append(KPICandidate(
-                    name="Total Record Count",
+                    name=f"Total {entity} Count",
                     column_name=None,
                     aggregation="COUNT",
-                    description="Total volume of transaction records",
+                    description=f"Total volume of recorded {entity.lower()}s",
                     importance="High"
                 ))
 
             dimensions = []
             if cat_cols:
-                for col in cat_cols[:3]:
+                for col in cat_cols[:4]:
                     dimensions.append(DimensionCandidate(
                         column_name=col,
                         dimension_name=col.replace('_', ' ').title(),
@@ -62,110 +99,97 @@ class MockLLMProvider(LLMProvider):
                     ))
             else:
                 dimensions.append(DimensionCandidate(
-                    column_name="category",
-                    dimension_name="Category Breakdown",
+                    column_name=primary_cat,
+                    dimension_name=primary_cat.replace('_', ' ').title(),
                     role="segmentation"
                 ))
 
+            core_q = [
+                f"How is {primary_num.replace('_', ' ')} distributed across {primary_cat.replace('_', ' ')} segments?",
+                f"Is there a statistically significant association between {primary_num.replace('_', ' ')} and {secondary_num.replace('_', ' ')}?",
+                f"What data quality anomalies, skewness, or outliers characterize {primary_num.replace('_', ' ')}?"
+            ]
+
             return DatasetUnderstanding(
-                domain="E-Commerce & Commercial Operations",
-                dataset_summary="A structured transaction dataset tracking orders, product categories, revenues, quantities, and regional distributions.",
-                target_entity="Order Transaction",
+                domain=domain,
+                dataset_summary=f"A structured {domain.lower()} dataset capturing {entity.lower()} entries across {len(numeric_cols)} quantitative metrics and {len(cat_cols)} categorical dimensions.",
+                target_entity=entity,
                 key_kpis=kpis,
                 important_dimensions=dimensions,
-                core_questions=[
-                    "What are the top-performing categories and regions by total revenue?",
-                    "What is the distribution of transaction volume across customer segments?",
-                    "Are there noticeable correlation patterns between pricing, quantities, and return rates?"
-                ],
-                data_limitations_note="Some categories may require standardizing whitespace or casing before categorical grouping."
+                core_questions=core_q,
+                data_limitations_note="Standard cross-sectional data hygiene verified. Category grouping standardizations applied."
             )  # type: ignore
 
         # 2. AnalysisPlan
         if response_model == AnalysisPlan:
-            cols = re.findall(r"['\"]([a-zA-Z0-9_]+)['\"]", prompt_text)
-            numeric_cols = [c for c in cols if any(k in c.lower() for k in ["revenue", "price", "quantity", "cost", "score", "rate", "amount"])]
-            cat_cols = [c for c in cols if any(k in c.lower() for k in ["region", "category", "product", "status", "country", "segment", "type"])]
-
-            num1 = numeric_cols[0] if numeric_cols else "total_revenue"
-            num2 = numeric_cols[1] if len(numeric_cols) > 1 else (numeric_cols[0] if numeric_cols else "quantity")
-            cat1 = cat_cols[0] if cat_cols else "region"
-
             group_plans = [
                 GroupByAnalysisPlan(
-                    group_column=cat1,
-                    metric_column=num1,
-                    aggregation="SUM",
-                    purpose=f"Evaluate {num1} performance across {cat1}"
+                    group_column=primary_cat,
+                    metric_column=primary_num,
+                    aggregation="SUM" if "rate" not in primary_num and "score" not in primary_num else "AVG",
+                    purpose=f"Evaluate {primary_num} performance across {primary_cat}"
                 )
             ]
 
             sql_goals = [
                 SQLQueryGoal(
-                    name=f"top_{cat1}_by_{num1}",
-                    purpose=f"Aggregate {num1} aggregated by {cat1} in descending order",
-                    columns_needed=[cat1, num1]
+                    name=f"top_{primary_cat}_by_{primary_num}",
+                    purpose=f"Aggregate {primary_num} grouped by {primary_cat} in descending order",
+                    columns_needed=[primary_cat, primary_num]
                 ),
                 SQLQueryGoal(
                     name="overall_metric_summary",
-                    purpose="Compute dataset-level summary KPIs (total rows, avg revenue)",
-                    columns_needed=[num1]
+                    purpose=f"Compute dataset-level summary KPIs (total rows, avg/min/max {primary_num})",
+                    columns_needed=[primary_num]
                 )
             ]
 
             charts = [
                 RecommendedChart(
                     chart_type="bar",
-                    x_column=cat1,
-                    y_column=num1,
-                    title=f"Total {num1.replace('_', ' ').title()} by {cat1.replace('_', ' ').title()}",
-                    purpose=f"Compare {num1} across {cat1} categories"
+                    x_column=primary_cat,
+                    y_column=primary_num,
+                    title=f"Total {primary_num.replace('_', ' ').title()} by {primary_cat.replace('_', ' ').title()}",
+                    purpose=f"Compare {primary_num} across {primary_cat} categories"
                 ),
                 RecommendedChart(
                     chart_type="scatter" if len(numeric_cols) > 1 else "histogram",
-                    x_column=num1,
-                    y_column=num2 if len(numeric_cols) > 1 else None,
-                    title=f"{num1.replace('_', ' ').title()} vs {num2.replace('_', ' ').title()}" if len(numeric_cols) > 1 else f"{num1} Distribution",
+                    x_column=primary_num,
+                    y_column=secondary_num if len(numeric_cols) > 1 else None,
+                    title=f"{primary_num.replace('_', ' ').title()} vs {secondary_num.replace('_', ' ').title()}" if len(numeric_cols) > 1 else f"{primary_num.replace('_', ' ').title()} Distribution",
                     purpose="Explore statistical relationship and outliers"
                 )
             ]
 
             return AnalysisPlan(
-                primary_goal="Maximize analytical insights into commercial revenue drivers and operational anomalies.",
-                descriptive_numeric_columns=numeric_cols[:4] if numeric_cols else [num1],
-                correlation_pairs=[[num1, num2]] if len(numeric_cols) >= 2 else [],
+                primary_goal=f"Maximize empirical insights into {domain.lower()} performance drivers, distributions, and anomalies.",
+                descriptive_numeric_columns=numeric_cols[:4] if numeric_cols else [primary_num],
+                correlation_pairs=[[primary_num, secondary_num]] if len(numeric_cols) >= 2 else [],
                 group_by_analyses=group_plans,
                 sql_query_goals=sql_goals,
-                pattern_detection_targets=[f"{num1} trends across segments"],
+                pattern_detection_targets=[f"{primary_num} trends across {primary_cat}"],
                 recommended_charts=charts
             )  # type: ignore
 
         # 3. SQLGenerationResponse
         from backend.app.models.sql import SQLGenerationResponse, GeneratedSQLQuery
         if response_model == SQLGenerationResponse:
-            cols = re.findall(r"['\"]([a-zA-Z0-9_]+)['\"]", prompt_text)
-            numeric_cols = [c for c in cols if any(k in c.lower() for k in ["revenue", "price", "quantity", "cost", "score", "rate", "amount"])]
-            cat_cols = [c for c in cols if any(k in c.lower() for k in ["region", "category", "product", "status", "country", "segment", "type"])]
-
-            # Extract table name if present
             table_match = re.search(r"table\s+['\"]?([a-zA-Z0-9_]+)['\"]?", prompt_text, re.IGNORECASE)
             tbl = table_match.group(1) if table_match else "dataset"
 
-            num1 = numeric_cols[0] if numeric_cols else "total_revenue"
-            cat1 = cat_cols[0] if cat_cols else "region"
-
+            agg_func = "SUM" if "rate" not in primary_num and "score" not in primary_num else "AVG"
             queries = [
                 GeneratedSQLQuery(
-                    name=f"top_{cat1}_by_{num1}",
-                    purpose=f"Aggregate total {num1} grouped by {cat1} in descending order",
-                    sql=f"SELECT {cat1}, SUM({num1}) AS total_{num1}, COUNT(*) AS transaction_count FROM {tbl} GROUP BY {cat1} ORDER BY total_{num1} DESC LIMIT 10",
-                    expected_columns=[cat1, f"total_{num1}", "transaction_count"]
+                    name=f"top_{primary_cat}_by_{primary_num}",
+                    purpose=f"Aggregate total {primary_num} grouped by {primary_cat} in descending order",
+                    sql=f"SELECT {primary_cat}, {agg_func}({primary_num}) AS total_{primary_num}, COUNT(*) AS record_count FROM {tbl} GROUP BY {primary_cat} ORDER BY total_{primary_num} DESC LIMIT 10",
+                    expected_columns=[primary_cat, f"total_{primary_num}", "record_count"]
                 ),
                 GeneratedSQLQuery(
                     name="overall_dataset_summary",
-                    purpose=f"Compute overall average, min, and max for {num1}",
-                    sql=f"SELECT COUNT(*) AS total_records, AVG({num1}) AS avg_{num1}, MIN({num1}) AS min_{num1}, MAX({num1}) AS max_{num1} FROM {tbl}",
-                    expected_columns=["total_records", f"avg_{num1}", f"min_{num1}", f"max_{num1}"]
+                    purpose=f"Compute overall average, min, and max for {primary_num}",
+                    sql=f"SELECT COUNT(*) AS total_records, AVG({primary_num}) AS avg_{primary_num}, MIN({primary_num}) AS min_{primary_num}, MAX({primary_num}) AS max_{primary_num} FROM {tbl}",
+                    expected_columns=["total_records", f"avg_{primary_num}", f"min_{primary_num}", f"max_{primary_num}"]
                 )
             ]
             return SQLGenerationResponse(queries=queries)  # type: ignore
@@ -183,40 +207,46 @@ class MockLLMProvider(LLMProvider):
             corr_matches = re.findall(r"- Correlation '([^']+)' vs '([^']+)': Pearson r=([+-]?[\d\.]+)", prompt_text)
             group_matches = re.findall(r"- GroupBy '([^']+)' by '([^']+)'.*?: ([^,\n]+)", prompt_text)
 
-            m1_name, m1_mean, m1_med = stat_matches[0] if stat_matches else ("Value Metric", "1,250.00", "980.00")
-            c1_name, c2_name, c_val = corr_matches[0] if corr_matches else ("Primary Metric", "Secondary Metric", "+0.72")
-            g_dim, g_met, g_top = group_matches[0] if group_matches else ("Category", "Volume", "Top Segment (45.2%)")
+            m1_name, m1_mean, m1_med = stat_matches[0] if stat_matches else (primary_num, "1,250.00", "980.00")
+            c1_name, c2_name, c_val = corr_matches[0] if corr_matches else (primary_num, secondary_num, "+0.72")
+            g_dim, g_met, g_top = group_matches[0] if group_matches else (primary_cat, primary_num, "Top Segment (45.2%)")
 
             insights = [
                 InsightItem(
                     id="ins_1",
-                    title=f"Segment Performance & {g_dim} Concentration",
+                    title=f"Segment Performance & {g_dim.replace('_', ' ').title()} Concentration",
                     finding=f"Operational metrics demonstrate pronounced concentration across {g_dim}, with leading segments dominating overall volume.",
                     evidence=f"Top segment distribution in {g_dim}: {g_top}. Group aggregation confirms statistically significant variance across segments.",
                     interpretation=f"The dataset reveals that high-performing {g_dim} segments drive the vast majority of {g_met}, creating concentrated exposure.",
                     implication=f"Focus strategic resource allocation and operational monitoring on top-performing {g_dim} groups while developing targeted growth initiatives for secondary segments.",
+                    question_answered=f"How is {g_met.replace('_', ' ')} distributed across {g_dim.replace('_', ' ')}, and do top segments concentrate the majority share?",
+                    empirical_answer=f"Yes, {g_dim.replace('_', ' ')} demonstrates high Pareto concentration, where leading segments account for {g_top}.",
                     category="Growth Driver",
                     importance="High",
                     confidence="High"
                 ),
                 InsightItem(
                     id="ins_2",
-                    title=f"Distribution Skewness in {m1_name}",
+                    title=f"Distribution Skewness in {m1_name.replace('_', ' ').title()}",
                     finding=f"Statistical analysis of '{m1_name}' indicates an asymmetric distribution where mean values diverge from the median baseline.",
                     evidence=f"Computed parametric moments for '{m1_name}': Mean = {m1_mean}, Median = {m1_med}. Skewness reflects an extended right-tail distribution.",
                     interpretation=f"A standard average significantly overstates baseline typical performance; median figures ({m1_med}) provide a more robust operational benchmark.",
                     implication=f"Adopt median-based KPI targets rather than simple arithmetic means to prevent high-value outliers from distorting performance targets.",
+                    question_answered=f"Does '{m1_name.replace('_', ' ')}' exhibit significant distribution skewness between arithmetic average and median benchmarks?",
+                    empirical_answer=f"Yes, Mean ({m1_mean}) noticeably diverges from Median ({m1_med}), demonstrating positive distribution skewness.",
                     category="Performance",
                     importance="Medium",
                     confidence="High"
                 ),
                 InsightItem(
                     id="ins_3",
-                    title=f"Empirical Association: {c1_name} vs {c2_name}",
+                    title=f"Empirical Association: {c1_name.replace('_', ' ').title()} vs {c2_name.replace('_', ' ').title()}",
                     finding=f"Detected a strong, statistically significant correlation between '{c1_name}' and '{c2_name}'.",
                     evidence=f"Pearson correlation coefficient r = {c_val} (statistically significant at p < 0.05). Verified across all cleaned dataset rows.",
                     interpretation=f"Movement in '{c1_name}' consistently tracks variations in '{c2_name}', indicating an underlying operational linkage.",
                     implication=f"Leverage '{c1_name}' as a leading indicator to forecast and optimize '{c2_name}' resource planning.",
+                    question_answered=f"Is there an empirical, statistically significant relationship linking '{c1_name.replace('_', ' ')}' with '{c2_name.replace('_', ' ')}'?",
+                    empirical_answer=f"Yes, Pearson r = {c_val} confirms a statistically significant empirical correlation (p < 0.05).",
                     category="Performance",
                     importance="High",
                     confidence="High"
@@ -224,7 +254,7 @@ class MockLLMProvider(LLMProvider):
             ]
 
             summary_points = [
-                f"Significant concentration across leading {g_dim} segments driving primary {g_met} volume.",
+                f"Significant concentration across leading {g_dim} segments driving primary {g_met} volume ({g_top}).",
                 f"Distribution skewness in {m1_name} (Mean={m1_mean} vs Median={m1_med}) necessitates median-based benchmarking.",
                 f"Statistically significant correlation (r = {c_val}) identified between {c1_name} and {c2_name}."
             ]
@@ -249,7 +279,7 @@ class MockLLMProvider(LLMProvider):
                     unsupported_claims=[
                         UnsupportedClaim(
                             insight_id="ins_fake",
-                            claim_text="Revenue grew by 9999% without baseline data",
+                            claim_text="Growth rate grew by 9999% without baseline data",
                             reason="Fabricated percentage not present in computed statistical results",
                             ground_truth_fact="Actual growth rate is within standard bounds"
                         )
@@ -272,29 +302,29 @@ class MockLLMProvider(LLMProvider):
         from backend.app.models.report import GeneratedReportMarkdown
         if response_model == GeneratedReportMarkdown:
             return GeneratedReportMarkdown(
-                title="Commercial & Operational Dataset Analysis Report",
-                subtitle="Executive Insights, Statistical Distributions, SQL Discoveries & Strategic Recommendations",
+                title=f"{domain} Executive Intelligence Report",
+                subtitle=f"Quantitative Profiling, Empirical Distributions, SQL Aggregations & Strategic Recommendations for {entity}",
                 executive_summary=(
-                    "This comprehensive analytical report evaluates the uploaded dataset structure, statistical properties, "
-                    "and operational dimensions. Our multi-agent pipeline processed the dataset across profiling, quality auditing, "
-                    "deterministic statistical modeling, SQL execution, pattern detection, and adversarial insight verification."
+                    f"This comprehensive analytical report evaluates the uploaded {domain.lower()} dataset structure, statistical moments, "
+                    f"and categorical dimensions. Our multi-agent pipeline processed the dataset across profiling, quality auditing, "
+                    f"deterministic statistical modeling ({primary_num}), DuckDB SQL execution, pattern detection, and adversarial insight verification."
                 ),
                 key_findings_markdown=(
-                    "### 1. Revenue Concentration & Product Performance\n"
-                    "- Commercial transaction volume shows pronounced category concentration.\n"
-                    "- Leading product categories generate the primary share of total gross revenue.\n\n"
-                    "### 2. Statistical Distribution & Outlier Behavior\n"
-                    "- Transaction distributions exhibit positive skewness, with the mean order value exceeding the median.\n"
-                    "- Extreme value anomalies were isolated and verified for audit integrity."
+                    f"### 1. Empirical Questions Answered & Segment Concentration\n"
+                    f"- Quantitative analysis of '{primary_num}' demonstrates significant variance across '{primary_cat}'.\n"
+                    f"- Leading '{primary_cat}' categories concentrate the primary volume share of '{primary_num}'.\n\n"
+                    f"### 2. Statistical Moments & Distribution Skewness\n"
+                    f"- '{primary_num}' exhibits positive distribution skewness, where arithmetic averages exceed median benchmarks.\n"
+                    f"- Extreme value anomalies and boundary outliers were isolated and verified for audit integrity."
                 ),
                 strategic_recommendations_markdown=(
-                    "1. **Inventory & Promotion Optimization**: Prioritize high-performing categories for inventory stocking.\n"
-                    "2. **Order Tiering & Upselling**: Introduce structured loyalty programs to boost average order value.\n"
-                    "3. **Data Quality Governance**: Deploy point-of-entry validation to prevent anomalous transaction inputs."
+                    f"1. **Targeted Segment Optimization**: Prioritize high-performing '{primary_cat}' groups for resource allocation and monitoring.\n"
+                    f"2. **Median-Based Benchmarking**: Adopt median metrics for '{primary_num}' to prevent outlier distortion in operational reviews.\n"
+                    f"3. **Data Hygiene Governance**: Maintain data entry validation rules to preserve quality score standards."
                 ),
                 methodology_and_caveats_markdown=(
                     "Analysis was conducted using deterministic computation (DuckDB SQL, SciPy moments, Pearson/Spearman correlations) "
-                    "combined with evidence-grounded AI synthesis. Caveats: Group differences reflect observed historical records."
+                    "combined with evidence-grounded AI multi-agent synthesis. Group differences reflect empirical historical records."
                 )
             )  # type: ignore
 
@@ -303,3 +333,4 @@ class MockLLMProvider(LLMProvider):
             return response_model()
         except Exception:
             raise ValueError(f"Mock provider cannot construct response_model '{response_model.__name__}'")
+

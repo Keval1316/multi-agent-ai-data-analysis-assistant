@@ -42,6 +42,57 @@ export default function OverviewTab({ report }) {
   const { understanding, profile, quality, statistics, sql_results, patterns, charts, insights, cleaning_summary } = report;
   const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
+  // Derive questions directly answered by empirical analysis and discovered patterns
+  const answeredQuestionsList = (insights?.insights || []).map((ins, idx) => {
+    const questionText =
+      ins.question_answered ||
+      `What key empirical pattern and operational dynamic characterizes ${ins.category || 'performance'} in ${ins.title}?`;
+    const answerText = ins.empirical_answer || ins.finding;
+    const evidenceText = ins.evidence || ins.supporting_evidence;
+    const actionText = ins.implication || ins.recommendation;
+
+    return {
+      id: ins.id || `q_${idx}`,
+      category: ins.category || 'Empirical Finding',
+      title: ins.title,
+      question: questionText,
+      answer: answerText,
+      evidence: evidenceText,
+      action: actionText,
+      importance: ins.importance || 'High',
+      confidence: ins.confidence || 'High'
+    };
+  });
+
+  const finalAnsweredQuestions =
+    answeredQuestionsList.length > 0
+      ? answeredQuestionsList
+      : [
+          ...(patterns?.concentrations || []).map((c, i) => ({
+            id: `pattern_conc_${i}`,
+            category: 'Concentration Pattern',
+            title: `Concentration in ${c.dimension_column}`,
+            question: `Is there significant Pareto concentration across ${c.dimension_column}?`,
+            answer: c.description,
+            evidence: `Top categories represent ${c.top_categories_share_pct?.toFixed(1)}% of volume.`,
+            action: `Focus resource allocation on top ${c.dimension_column} segments.`,
+            importance: 'High'
+          })),
+          ...(statistics?.correlation_results || []).slice(0, 2).map((cr, i) => ({
+            id: `stat_corr_${i}`,
+            category: 'Statistical Association',
+            title: `${cr.col1} vs ${cr.col2}`,
+            question: `Is there a statistically significant correlation between ${cr.col1} and ${cr.col2}?`,
+            answer: `Pearson correlation r = ${cr.pearson_coef?.toFixed(3)} (p = ${cr.pearson_pvalue?.toFixed(4)}).`,
+            evidence: cr.is_statistically_significant
+              ? 'Statistically significant relationship (p < 0.05).'
+              : 'Not statistically significant.',
+            action: `Monitor ${cr.col1} as an indicator for ${cr.col2}.`,
+            importance: 'Medium'
+          }))
+        ];
+
+
   const handleDownloadCsv = async () => {
     try {
       setDownloadingCsv(true);
@@ -132,8 +183,8 @@ export default function OverviewTab({ report }) {
       headline: `Synthesized business domain as "${understanding?.domain || 'General Data'}" targeting ${understanding?.target_entity || 'records'}.`,
       details: [
         `Extracted ${understanding?.key_kpis?.length || 0} core business KPIs: ${understanding?.key_kpis?.map(k => k.name).join(', ') || 'Primary Revenue/Volume metrics'}.`,
-        `Structured ${understanding?.core_questions?.length || 0} strategic business hypotheses and executive exploration vectors.`,
-        `Mapped contextual dimension hierarchies across ${understanding?.important_dimensions?.join(', ') || 'available attributes'}.`
+        `Scoped multi-variable exploration vectors and candidate KPIs for empirical validation.`,
+        `Mapped contextual dimension hierarchies across ${understanding?.important_dimensions?.map(d => d.dimension_name || d.column_name || d).join(', ') || 'available attributes'}.`
       ],
       badge: `${understanding?.key_kpis?.length || 0} Key KPIs`
     },
@@ -504,29 +555,82 @@ export default function OverviewTab({ report }) {
         )}
       </div>
 
-      {/* 4. Core Strategic Questions Answered */}
-      {understanding?.core_questions?.length > 0 && (
-        <div className="glass-card p-6 md:p-8 rounded-3xl space-y-4 shadow-glass">
-          <div className="flex items-center space-x-2.5">
-            <div className="w-8 h-8 rounded-xl bg-[#AD8B73]/15 text-[#3E2723] flex items-center justify-center">
-              <HelpCircle className="w-5 h-5 text-[#AD8B73]" />
+      {/* 4. Empirical Business Questions Resolved by Analysis */}
+      {finalAnsweredQuestions.length > 0 && (
+        <div className="glass-card p-6 md:p-8 rounded-3xl space-y-6 shadow-glass border border-[#CEAB93]/60 bg-gradient-to-br from-white/95 via-[#FFFBE9]/80 to-[#E3CAA5]/20">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-[#CEAB93]/40">
+            <div className="flex items-center space-x-2.5">
+              <div className="w-9 h-9 rounded-2xl bg-gradient-to-br from-[#AD8B73] to-[#3E2723] text-white flex items-center justify-center shadow-sm">
+                <HelpCircle className="w-5 h-5 text-[#FFFBE9]" />
+              </div>
+              <div>
+                <h4 className="font-extrabold text-[#3E2723] text-base md:text-lg tracking-tight font-display">
+                  Empirical Business Questions Resolved by Analysis
+                </h4>
+                <p className="text-xs text-[#7D5A44] font-medium">
+                  Every question is dynamically formulated from discovered statistical patterns, correlations, and SQL findings.
+                </p>
+              </div>
             </div>
-            <h4 className="font-extrabold text-[#3E2723] text-sm md:text-base tracking-tight font-display">
-              Core Strategic Business Questions Answered
-            </h4>
+            <span className="text-xs font-mono font-bold px-3 py-1 rounded-full bg-[#AD8B73]/15 text-[#3E2723] border border-[#CEAB93]/60 self-start sm:self-center">
+              {finalAnsweredQuestions.length} Questions Answered
+            </span>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-            {understanding.core_questions.map((q, idx) => (
-              <div
-                key={idx}
-                className="p-4 rounded-2xl bg-white/80 border border-[#CEAB93]/40 text-xs text-[#3E2723] flex items-start space-x-3.5 shadow-sm hover:border-[#AD8B73] transition-colors"
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+            {finalAnsweredQuestions.map((item, idx) => (
+              <motion.div
+                key={item.id || idx}
+                whileHover={{ y: -3 }}
+                className="p-5 md:p-6 rounded-3xl bg-white/90 border border-[#CEAB93]/50 shadow-sm hover:shadow-md transition-all space-y-4 flex flex-col justify-between"
               >
-                <span className="w-6 h-6 rounded-xl bg-gradient-to-br from-[#AD8B73] to-[#3E2723] text-white font-mono text-xs font-bold flex items-center justify-center flex-shrink-0 shadow-sm">
-                  {idx + 1}
-                </span>
-                <span className="leading-relaxed font-medium">{q}</span>
-              </div>
+                <div className="space-y-3">
+                  {/* Category & Verified Badge */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <span className="w-6 h-6 rounded-xl bg-gradient-to-br from-[#AD8B73] to-[#3E2723] text-white font-mono text-xs font-bold flex items-center justify-center flex-shrink-0 shadow-xs">
+                        Q{idx + 1}
+                      </span>
+                      <span className="font-mono text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-full bg-[#AD8B73]/15 text-[#3E2723] border border-[#CEAB93]/50">
+                        {item.category}
+                      </span>
+                    </div>
+                    <span className="text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
+                      Answered & Verified
+                    </span>
+                  </div>
+
+                  {/* The Dynamic Question */}
+                  <h5 className="font-extrabold text-sm md:text-base text-[#3E2723] font-display leading-snug">
+                    {item.question}
+                  </h5>
+
+                  {/* The Empirical Answer / Finding */}
+                  <div className="text-xs text-[#3E2723] bg-[#FFFBE9]/90 p-3.5 rounded-2xl border border-[#CEAB93]/50 leading-relaxed space-y-1">
+                    <div className="flex items-center space-x-1.5 font-bold text-[#3E2723] text-[11px]">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                      <span>Empirical Data Answer</span>
+                    </div>
+                    <p className="font-normal">{item.answer}</p>
+                  </div>
+                </div>
+
+                {/* Evidence & Actionable Implication Footer */}
+                <div className="space-y-2 pt-2 border-t border-[#CEAB93]/30 text-[11px]">
+                  {item.evidence && (
+                    <div className="text-[#7D5A44] bg-white/60 p-2.5 rounded-xl border border-[#CEAB93]/30 font-mono">
+                      <b className="text-[#3E2723] font-sans">Evidence: </b>
+                      {item.evidence}
+                    </div>
+                  )}
+                  {item.action && (
+                    <div className="text-[#3E2723] bg-[#AD8B73]/10 p-2.5 rounded-xl border border-[#CEAB93]/40 flex items-start space-x-1.5">
+                      <Zap className="w-3.5 h-3.5 text-[#AD8B73] mt-0.5 flex-shrink-0" />
+                      <span><b className="font-semibold">Action: </b>{item.action}</span>
+                    </div>
+                  )}
+                </div>
+              </motion.div>
             ))}
           </div>
         </div>
@@ -534,3 +638,4 @@ export default function OverviewTab({ report }) {
     </motion.div>
   );
 }
+

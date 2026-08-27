@@ -90,11 +90,18 @@ export default function InsightsTab({ report }) {
                   {ins.title}
                 </h4>
 
+                {ins.question_answered && (
+                  <div className="text-[11px] text-[#7D5A44] bg-[#E3CAA5]/20 px-3 py-2 rounded-xl border border-[#CEAB93]/40 leading-snug">
+                    <span className="font-bold text-[#3E2723]">Investigated Question: </span>
+                    <span>{ins.question_answered}</span>
+                  </div>
+                )}
+
                 {/* 1. Finding */}
                 <div className="text-xs text-[#3E2723] bg-white/70 p-3 rounded-2xl border border-[#CEAB93]/30 leading-relaxed font-medium">
                   <div className="flex items-center space-x-1.5 font-bold text-[#3E2723] mb-1 text-[11px]">
                     <FileCheck2 className="w-3.5 h-3.5 text-[#AD8B73]" />
-                    <span>Finding</span>
+                    <span>Finding & Answer</span>
                   </div>
                   {ins.finding}
                 </div>

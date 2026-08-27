@@ -47,4 +47,6 @@ def test_insight_generation(analysis_pipeline_context):
         assert ins.title != ""
         assert ins.finding != ""
         assert ins.supporting_evidence != ""
+        assert ins.question_answered is not None and len(ins.question_answered) > 0
+        assert ins.empirical_answer is not None and len(ins.empirical_answer) > 0
         assert ins.importance in ["High", "Medium", "Low"]

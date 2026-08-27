@@ -9,6 +9,8 @@ class InsightItem(BaseModel):
     evidence: str = Field(..., description="Exact numbers, percentages, baseline figures, correlations, or SQL outputs")
     interpretation: str = Field(..., description="Business, operational, clinical, or domain significance of the numbers")
     implication: str = Field(..., description="Strategic recommendation or actionable next step for decision-makers")
+    question_answered: Optional[str] = Field(None, description="The specific core business/analytical question this insight answers based on actual data patterns")
+    empirical_answer: Optional[str] = Field(None, description="Direct quantitative answer backed by empirical data and statistical patterns")
     supporting_evidence: Optional[str] = Field(None, description="Compatibility alias for evidence")
     recommendation: Optional[str] = Field(None, description="Compatibility alias for implication")
     importance: str = Field("High", description="'High', 'Medium', or 'Low'")
@@ -31,6 +33,18 @@ class InsightItem(BaseModel):
             elif "recommendation" not in data and "implication" in data:
                 data["recommendation"] = data["implication"]
 
+            # Sync empirical_answer and finding
+            if "empirical_answer" not in data and "finding" in data:
+                data["empirical_answer"] = data["finding"]
+            elif "finding" not in data and "empirical_answer" in data:
+                data["finding"] = data["empirical_answer"]
+
+            # Default question_answered if missing
+            if not data.get("question_answered"):
+                cat = data.get("category", "performance")
+                title = data.get("title", "this metric")
+                data["question_answered"] = f"What key empirical pattern is revealed regarding {cat} in {title}?"
+
             # Default interpretation if missing
             if "interpretation" not in data:
                 data["interpretation"] = data.get("finding", "")
@@ -42,4 +56,6 @@ class InsightCollection(BaseModel):
     insights: List[InsightItem] = Field(..., min_length=1, description="List of evidence-grounded insights")
     executive_summary_points: List[str] = Field(default_factory=list, description="Top 3-4 bullet takeaways")
     overall_confidence_rating: str = Field("High", description="'High', 'Medium', 'Low'")
+    answered_questions: Optional[List[dict]] = Field(default_factory=list, description="List of data-driven questions with empirical answers")
+
 

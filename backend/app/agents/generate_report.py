@@ -38,8 +38,11 @@ class ReportGenerationAgent:
         
         insight_blocks = []
         for ins in insights.insights:
+            q_text = ins.question_answered or f"What key empirical pattern is revealed regarding {ins.category} in {ins.title}?"
+            ans_text = ins.empirical_answer or ins.finding
             insight_blocks.append(
-                f"- **{ins.title}** [{ins.category}]: {ins.finding}\n"
+                f"- **Question Answered**: *{q_text}*\n"
+                f"  **Empirical Answer / Finding**: {ans_text}\n"
                 f"  *Evidence*: {ins.evidence or ins.supporting_evidence}\n"
                 f"  *Interpretation*: {ins.interpretation}\n"
                 f"  *Actionable Implication*: {ins.implication or ins.recommendation}"
