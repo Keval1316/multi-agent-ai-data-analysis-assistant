@@ -70,10 +70,11 @@ async def event_generator_from_graph(initial_state: dict) -> AsyncGenerator[str,
 
         # Pipeline completed
         final_report = current_state.get("report")
+        report_dict = final_report.model_dump(mode="json") if final_report else None
         yield format_sse_event("complete", {
             "dataset_id": dataset_id,
             "filename": initial_state.get("filename", "dataset.csv"),
-            "report": final_report.model_dump() if final_report else None,
+            "report": report_dict,
             "status": "success"
         })
         logger.info(f"SSE analysis pipeline stream finished successfully for '{dataset_id}'")

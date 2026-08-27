@@ -25,16 +25,64 @@ import {
   Check,
   Zap,
   Activity,
-  Terminal
+  Terminal,
+  Download,
+  FileSpreadsheet
 } from 'lucide-react';
 
 export default function OverviewTab({ report }) {
   const [expandedStep, setExpandedStep] = useState(null);
   const [filterCategory, setFilterCategory] = useState('all');
+  const [downloadingCsv, setDownloadingCsv] = useState(false);
+  const [downloadingXlsx, setDownloadingXlsx] = useState(false);
 
   if (!report) return null;
 
-  const { understanding, profile, quality, statistics, sql_results, patterns, charts, insights } = report;
+  const datasetId = report.dataset_id;
+  const { understanding, profile, quality, statistics, sql_results, patterns, charts, insights, cleaning_summary } = report;
+
+  const handleDownloadCsv = async () => {
+    try {
+      setDownloadingCsv(true);
+      const res = await fetch(`http://localhost:8000/api/dataset/${datasetId}/download/cleaned-csv`);
+      if (!res.ok) throw new Error('Failed to download cleaned CSV');
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `cleaned_${report.filename || 'dataset.csv'}`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (err) {
+      console.error('Error downloading clean CSV:', err);
+    } finally {
+      setDownloadingCsv(false);
+    }
+  };
+
+  const handleDownloadExcel = async () => {
+    try {
+      setDownloadingXlsx(true);
+      const res = await fetch(`http://localhost:8000/api/dataset/${datasetId}/download/cleaned-excel`);
+      if (!res.ok) throw new Error('Failed to download cleaned Excel');
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const base = report.filename ? report.filename.replace(/\.[^/.]+$/, '') : 'dataset';
+      a.download = `cleaned_${base}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (err) {
+      console.error('Error downloading clean Excel:', err);
+    } finally {
+      setDownloadingXlsx(false);
+    }
+  };
 
   // Build the complete, dynamic list of concrete steps taken by the AI multi-agent pipeline
   const aiSteps = [
@@ -254,6 +302,48 @@ export default function OverviewTab({ report }) {
             <span className="text-xl font-extrabold text-[#3E2723] font-mono">{profile?.duplicate_rows_count || 0}</span>
           </div>
           <FileCheck2 className="w-12 h-12 text-[#AD8B73]/10 absolute -bottom-2 -right-2 pointer-events-none" />
+        </div>
+      </div>
+
+      {/* Clean Dataset Quick Export Banner */}
+      <div className="glass-card p-5 md:p-6 rounded-3xl border border-emerald-200 bg-gradient-to-r from-emerald-50/90 via-white/90 to-[#FFFBE9]/90 shadow-glass flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center space-x-3.5">
+          <div className="w-10 h-10 rounded-2xl bg-emerald-100 text-emerald-800 flex items-center justify-center flex-shrink-0 border border-emerald-300">
+            <ShieldCheck className="w-5 h-5 text-emerald-600" />
+          </div>
+          <div>
+            <div className="flex items-center space-x-2">
+              <h4 className="font-extrabold text-sm md:text-base text-[#3E2723] font-display">
+                Updated & Cleaned Dataset Ready
+              </h4>
+              <span className="text-[10px] font-mono font-bold uppercase px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
+                100% Sanitized
+              </span>
+            </div>
+            <p className="text-xs text-[#7D5A44] mt-0.5">
+              Missing values imputed, duplicate rows purged, and categories normalized.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center space-x-2.5 self-start sm:self-center flex-shrink-0">
+          <button
+            onClick={handleDownloadCsv}
+            disabled={downloadingCsv}
+            className="px-4 py-2.5 rounded-xl bg-[#AD8B73] hover:bg-[#3E2723] text-white font-extrabold text-xs shadow-sm hover:shadow transition-all flex items-center space-x-1.5 cursor-pointer disabled:opacity-50"
+          >
+            <Download className={`w-3.5 h-3.5 ${downloadingCsv ? 'animate-bounce' : ''}`} />
+            <span>{downloadingCsv ? 'Downloading...' : 'Download Clean CSV'}</span>
+          </button>
+
+          <button
+            onClick={handleDownloadExcel}
+            disabled={downloadingXlsx}
+            className="px-4 py-2.5 rounded-xl bg-white border border-[#CEAB93] text-[#3E2723] font-extrabold text-xs hover:bg-[#FFFBE9] shadow-xs transition-all flex items-center space-x-1.5 cursor-pointer disabled:opacity-50"
+          >
+            <FileSpreadsheet className={`w-3.5 h-3.5 text-[#AD8B73] ${downloadingXlsx ? 'animate-bounce' : ''}`} />
+            <span>{downloadingXlsx ? 'Building...' : 'Excel (.xlsx)'}</span>
+          </button>
         </div>
       </div>
 

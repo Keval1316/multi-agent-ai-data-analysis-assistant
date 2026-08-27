@@ -1,3 +1,4 @@
+import pandas as pd
 from fastapi import APIRouter, HTTPException, Response
 from backend.app.core.logging import logger
 from backend.app.models.report import AnalysisReport
@@ -77,3 +78,105 @@ async def download_pdf_report(dataset_id: str):
     except Exception as e:
         logger.error(f"Error rendering PDF for '{dataset_id}': {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to render PDF: {str(e)}")
+
+
+@router.get("/{dataset_id}/download/cleaned-csv")
+async def download_cleaned_csv(dataset_id: str):
+    """Generates and streams the sanitized, production-ready CSV dataset."""
+    logger.info(f"Received request for cleaned CSV download on dataset '{dataset_id}'")
+    from backend.app.services.cleaning.cleaner import DataCleaner
+
+    cleaned_df = ReportBuilder.get_cleaned_df(dataset_id)
+    report = ReportBuilder.get_report(dataset_id)
+    filename = report.filename if report else f"{dataset_id}.csv"
+    clean_base = filename.rsplit(".", 1)[0] if "." in filename else filename
+
+    if cleaned_df is None:
+        tbl = duckdb_manager.generate_table_name(dataset_id)
+        if not duckdb_manager.table_exists(tbl):
+            raise HTTPException(status_code=404, detail=f"Dataset '{dataset_id}' not found.")
+        df = duckdb_manager.get_dataframe(tbl)
+        cleaned_df, cleaning_summary = DataCleaner.clean_dataset(df, dataset_id, filename)
+        ReportBuilder.cache_cleaned_df(dataset_id, cleaned_df)
+
+    try:
+        csv_bytes = DataCleaner.export_csv_bytes(cleaned_df)
+        download_filename = f"cleaned_{clean_base}.csv"
+        return Response(
+            content=csv_bytes,
+            media_type="text/csv",
+            headers={
+                "Content-Disposition": f'attachment; filename="{download_filename}"',
+                "Content-Length": str(len(csv_bytes))
+            }
+        )
+    except Exception as e:
+        logger.error(f"Error exporting cleaned CSV for '{dataset_id}': {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to export cleaned CSV: {str(e)}")
+
+
+@router.get("/{dataset_id}/download/cleaned-excel")
+async def download_cleaned_excel(dataset_id: str):
+    """Generates and streams the sanitized, styled Excel (.xlsx) dataset."""
+    logger.info(f"Received request for cleaned Excel download on dataset '{dataset_id}'")
+    from backend.app.services.cleaning.cleaner import DataCleaner
+
+    cleaned_df = ReportBuilder.get_cleaned_df(dataset_id)
+    report = ReportBuilder.get_report(dataset_id)
+    filename = report.filename if report else f"{dataset_id}.csv"
+    clean_base = filename.rsplit(".", 1)[0] if "." in filename else filename
+
+    if cleaned_df is None:
+        tbl = duckdb_manager.generate_table_name(dataset_id)
+        if not duckdb_manager.table_exists(tbl):
+            raise HTTPException(status_code=404, detail=f"Dataset '{dataset_id}' not found.")
+        df = duckdb_manager.get_dataframe(tbl)
+        cleaned_df, _ = DataCleaner.clean_dataset(df, dataset_id, filename)
+        ReportBuilder.cache_cleaned_df(dataset_id, cleaned_df)
+
+    try:
+        excel_bytes = DataCleaner.export_excel_bytes(cleaned_df, sheet_name="Cleaned Data")
+        download_filename = f"cleaned_{clean_base}.xlsx"
+        return Response(
+            content=excel_bytes,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={
+                "Content-Disposition": f'attachment; filename="{download_filename}"',
+                "Content-Length": str(len(excel_bytes))
+            }
+        )
+    except Exception as e:
+        logger.error(f"Error exporting cleaned Excel for '{dataset_id}': {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to export cleaned Excel: {str(e)}")
+
+
+@router.get("/{dataset_id}/cleaned-preview")
+async def get_cleaned_preview(dataset_id: str):
+    """Returns top 20 rows and transformation summary of the cleaned dataset for UI preview."""
+    logger.info(f"Received request for cleaned preview on dataset '{dataset_id}'")
+    from backend.app.services.cleaning.cleaner import DataCleaner
+
+    cleaned_df = ReportBuilder.get_cleaned_df(dataset_id)
+    report = ReportBuilder.get_report(dataset_id)
+
+    if cleaned_df is None:
+        tbl = duckdb_manager.generate_table_name(dataset_id)
+        if not duckdb_manager.table_exists(tbl):
+            raise HTTPException(status_code=404, detail=f"Dataset '{dataset_id}' not found.")
+        df = duckdb_manager.get_dataframe(tbl)
+        filename = report.filename if report else "dataset.csv"
+        cleaned_df, cleaning_summary = DataCleaner.clean_dataset(df, dataset_id, filename)
+        ReportBuilder.cache_cleaned_df(dataset_id, cleaned_df)
+        if report:
+            report.cleaning_summary = cleaning_summary.model_dump()
+
+    # Replace NaNs/Infs for JSON serialization
+    clean_preview = cleaned_df.head(20).where(pd.notnull(cleaned_df.head(20)), None)
+    return {
+        "dataset_id": dataset_id,
+        "total_rows": len(cleaned_df),
+        "total_columns": len(cleaned_df.columns),
+        "columns": list(cleaned_df.columns),
+        "rows": clean_preview.to_dict(orient="records"),
+        "cleaning_summary": report.cleaning_summary if report else None
+    }

@@ -18,10 +18,14 @@ from backend.app.agents.generate_report import ReportGenerationAgent
 from backend.app.services.ingestion.duckdb_manager import duckdb_manager
 
 
+from backend.app.services.cleaning.cleaner import DataCleaner, CleaningSummary
+
+
 class ReportBuilder:
     """Manages full end-to-end report generation pipeline and in-memory caching."""
 
     _cached_reports: Dict[str, AnalysisReport] = {}
+    _cached_cleaned_dfs: Dict[str, pd.DataFrame] = {}
 
     @classmethod
     def get_report(cls, dataset_id: str) -> Optional[AnalysisReport]:
@@ -30,6 +34,14 @@ class ReportBuilder:
     @classmethod
     def cache_report(cls, report: AnalysisReport):
         cls._cached_reports[report.dataset_id] = report
+
+    @classmethod
+    def get_cleaned_df(cls, dataset_id: str) -> Optional[pd.DataFrame]:
+        return cls._cached_cleaned_dfs.get(dataset_id)
+
+    @classmethod
+    def cache_cleaned_df(cls, dataset_id: str, df: pd.DataFrame):
+        cls._cached_cleaned_dfs[dataset_id] = df
 
     @classmethod
     def list_history(cls):
@@ -48,7 +60,8 @@ class ReportBuilder:
                 "total_columns": r.profile.total_columns if r.profile else 0,
                 "domain": r.understanding.domain if r.understanding else "General Data",
                 "charts_count": len(r.charts.charts) if r.charts and r.charts.charts else 0,
-                "insights_count": len(r.insights.insights) if r.insights and r.insights.insights else 0
+                "insights_count": len(r.insights.insights) if r.insights and r.insights.insights else 0,
+                "cleaning_summary": r.cleaning_summary
             })
         return history
 
@@ -57,6 +70,8 @@ class ReportBuilder:
         """Deletes a cached report and cleans up any related DuckDB table."""
         if dataset_id in cls._cached_reports:
             del cls._cached_reports[dataset_id]
+            if dataset_id in cls._cached_cleaned_dfs:
+                del cls._cached_cleaned_dfs[dataset_id]
             try:
                 tbl = duckdb_manager.generate_table_name(dataset_id)
                 duckdb_manager.drop_table(tbl)
@@ -115,6 +130,11 @@ class ReportBuilder:
             insights=insights,
             filename=filename
         )
+
+        # 8. Deterministic Data Cleaning & Sanitization
+        cleaned_df, cleaning_summary = DataCleaner.clean_dataset(df, dataset_id, filename)
+        cls.cache_cleaned_df(dataset_id, cleaned_df)
+        report.cleaning_summary = cleaning_summary.model_dump()
 
         # Cache report
         cls.cache_report(report)

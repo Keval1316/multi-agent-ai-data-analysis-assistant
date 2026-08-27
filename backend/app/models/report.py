@@ -43,3 +43,4 @@ class AnalysisReport(BaseModel):
     patterns: PatternDetectionResult
     charts: ChartCollection
     insights: InsightCollection
+    cleaning_summary: Optional[Dict[str, Any]] = None

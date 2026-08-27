@@ -328,6 +328,16 @@ def generate_report_node(state: AnalysisWorkflowState) -> Dict[str, Any]:
 def render_pdf_node(state: AnalysisWorkflowState) -> Dict[str, Any]:
     logger.info("[Node 17: render_pdf] Rendering downloadable PDF and caching report")
     report = state["report"]
+    df = state.get("df")
+    dataset_id = state.get("dataset_id") or report.dataset_id
+    filename = state.get("filename", "dataset.csv")
+
+    if df is not None:
+        from backend.app.services.cleaning.cleaner import DataCleaner
+        cleaned_df, cleaning_summary = DataCleaner.clean_dataset(df, dataset_id, filename)
+        ReportBuilder.cache_cleaned_df(dataset_id, cleaned_df)
+        report.cleaning_summary = cleaning_summary.model_dump()
+
     pdf_bytes = PDFExporter.generate_pdf(report)
     ReportBuilder.cache_report(report)
 

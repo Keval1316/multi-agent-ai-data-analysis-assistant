@@ -30,6 +30,7 @@ import VisualizationsTab from './components/VisualizationsTab';
 import InsightsTab from './components/InsightsTab';
 import ReportMarkdownTab from './components/ReportMarkdownTab';
 import HistorySidebar from './components/HistorySidebar';
+import CleanDataTab from './components/CleanDataTab';
 
 export default function App() {
   const [stage, setStage] = useState('upload'); // 'upload' | 'streaming' | 'dashboard'
@@ -196,7 +197,12 @@ ORD-2010,Hank Green,electronics,Mouse,2,25.00,0,50.00,2025-01-10,False,West`;
           if (eventMatch && dataMatch) {
             const eventType = eventMatch[1];
             try {
-              const data = JSON.parse(dataMatch[1]);
+              // Sanitize non-standard JSON tokens like NaN, Infinity, -Infinity
+              const sanitizedJson = dataMatch[1]
+                .replace(/:\s*NaN\b/g, ': null')
+                .replace(/:\s*Infinity\b/g, ': null')
+                .replace(/:\s*-Infinity\b/g, ': null');
+              const data = JSON.parse(sanitizedJson);
 
               if (eventType === 'step_complete') {
                 setCurrentStep(data.step);
@@ -643,6 +649,7 @@ ORD-2010,Hank Green,electronics,Mouse,2,25.00,0,50.00,2025-01-10,False,West`;
               <div className="flex items-center space-x-2 overflow-x-auto pb-1 text-xs font-bold font-sans">
                 {[
                   { id: 'overview', label: 'Executive Overview', icon: Sparkles },
+                  { id: 'cleandata', label: 'Cleaned Dataset & Export', icon: FileSpreadsheet },
                   { id: 'quality', label: 'Data Quality & Schema', icon: ShieldCheck },
                   { id: 'statistics', label: 'Statistics & SQL', icon: Database },
                   { id: 'visualizations', label: 'Interactive Visuals', icon: BarChart3 },
@@ -671,6 +678,7 @@ ORD-2010,Hank Green,electronics,Mouse,2,25.00,0,50.00,2025-01-10,False,West`;
               {/* Tab Contents */}
               <div>
                 {activeTab === 'overview' && <OverviewTab report={finalReport} />}
+                {activeTab === 'cleandata' && <CleanDataTab report={finalReport} />}
                 {activeTab === 'quality' && <DataQualityTab report={finalReport} />}
                 {activeTab === 'statistics' && <StatisticsTab report={finalReport} />}
                 {activeTab === 'visualizations' && <VisualizationsTab report={finalReport} />}

@@ -1,6 +1,22 @@
 import json
+import math
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
+
+
+def clean_nan_and_inf(obj: Any) -> Any:
+    """Recursively replaces NaN, Infinity, and -Infinity values with None for standard JSON compatibility."""
+    if isinstance(obj, float):
+        if math.isnan(obj) or math.isinf(obj):
+            return None
+        return obj
+    elif isinstance(obj, dict):
+        return {k: clean_nan_and_inf(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [clean_nan_and_inf(v) for v in obj]
+    elif isinstance(obj, tuple):
+        return [clean_nan_and_inf(v) for v in obj]
+    return obj
 
 
 STEP_METADATA: Dict[str, Dict[str, Any]] = {
@@ -27,9 +43,10 @@ TOTAL_PIPELINE_STEPS = 17
 
 
 def format_sse_event(event_type: str, data: Dict[str, Any]) -> str:
-    """Formats payload as a standard Server-Sent Event (SSE) string."""
+    """Formats payload as a standard Server-Sent Event (SSE) string with strict standard JSON."""
+    sanitized_data = clean_nan_and_inf(data)
     payload = {
-        **data,
+        **sanitized_data,
         "timestamp": datetime.now(timezone.utc).isoformat()
     }
-    return f"event: {event_type}\ndata: {json.dumps(payload)}\n\n"
+    return f"event: {event_type}\ndata: {json.dumps(payload, default=str)}\n\n"
