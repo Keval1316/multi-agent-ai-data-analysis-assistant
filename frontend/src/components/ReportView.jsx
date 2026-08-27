@@ -25,8 +25,17 @@ export default function ReportView({ report, datasetId }) {
     setDownloadError(null);
     try {
       const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
-      const targetId = datasetId || report.dataset_id;
-      const res = await fetch(`${apiBase}/api/dataset/${targetId}/report/pdf`);
+      const targetId = datasetId || report?.dataset_id || 'export';
+      let res = await fetch(`${apiBase}/api/dataset/${targetId}/report/pdf`);
+
+      // Fallback to POST with report JSON payload if 404
+      if (!res.ok && report) {
+        res = await fetch(`${apiBase}/api/dataset/report/pdf`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(report),
+        });
+      }
 
       if (!res.ok) {
         throw new Error(`Failed to generate PDF (${res.status} ${res.statusText})`);
@@ -51,49 +60,47 @@ export default function ReportView({ report, datasetId }) {
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 12 }}
+      initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4 }}
+      transition={{ duration: 0.3 }}
       className="space-y-8"
     >
-      {/* 1. Header Banner & Download Bar */}
-      <div className="p-6 md:p-8 rounded-3xl bg-surface border border-border shadow-sm flex flex-col md:flex-row md:items-center md:justify-between gap-6">
-        <div className="space-y-2">
+      {/* 1. Header & Actions */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-6 rounded-3xl bg-surface border border-border shadow-sm">
+        <div className="space-y-1">
           <div className="flex items-center space-x-2">
-            <span className="text-xs font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 flex items-center gap-1">
-              <Sparkles className="w-3 h-3" /> Multi-Agent Executive Report
+            <span className="text-xs font-mono uppercase px-2.5 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 font-bold">
+              Grade {report.quality?.grade || 'A'} Analysis
             </span>
             <span className="text-xs text-text-secondary font-mono">
-              Grade {report.quality?.grade || 'A'} • {report.quality?.quality_score || 95}/100 Quality
+              Dataset ID: {datasetId || report.dataset_id}
             </span>
           </div>
-          <h2 className="text-2xl md:text-3xl font-extrabold text-text-primary tracking-tight">
+          <h2 className="text-2xl font-bold text-text-primary tracking-tight">
             {report.title}
           </h2>
-          <p className="text-sm text-text-secondary max-w-2xl">
+          <p className="text-xs text-text-secondary">
             {report.subtitle}
           </p>
         </div>
 
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-          <button
-            onClick={handleDownloadPDF}
-            disabled={downloading}
-            className="flex items-center space-x-2 px-5 py-3 rounded-2xl bg-primary text-white font-semibold text-sm hover:bg-primary-hover shadow-md hover:shadow-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed group cursor-pointer"
-          >
-            {downloading ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                <span>Generating PDF...</span>
-              </>
-            ) : (
-              <>
-                <Download className="w-4 h-4 group-hover:-translate-y-0.5 transition-transform" />
-                <span>Download PDF Report</span>
-              </>
-            )}
-          </button>
-        </div>
+        <button
+          onClick={handleDownloadPDF}
+          disabled={downloading}
+          className="flex items-center justify-center space-x-2 px-5 py-3 rounded-2xl bg-primary text-primary-foreground font-semibold hover:bg-primary/90 transition-all shadow-md shadow-primary/20 disabled:opacity-50 cursor-pointer text-xs self-start md:self-auto"
+        >
+          {downloading ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span>Generating PDF...</span>
+            </>
+          ) : (
+            <>
+              <Download className="w-4 h-4" />
+              <span>Download Executive PDF</span>
+            </>
+          )}
+        </button>
       </div>
 
       {downloadError && (
@@ -135,9 +142,9 @@ export default function ReportView({ report, datasetId }) {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {report.insights?.insights?.map((ins) => (
+          {report.insights?.insights?.map((ins, idx) => (
             <motion.div
-              key={ins.id}
+              key={ins.id || `insight-${idx}`}
               whileHover={{ y: -3 }}
               className="p-5 rounded-3xl bg-surface border border-border shadow-sm flex flex-col justify-between space-y-4"
             >
@@ -186,8 +193,8 @@ export default function ReportView({ report, datasetId }) {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {report.charts.charts.map((spec) => (
-              <ChartRenderer key={spec.id} spec={spec} />
+            {report.charts.charts.map((spec, idx) => (
+              <ChartRenderer key={spec.id || `chart-${idx}`} spec={spec} />
             ))}
           </div>
         </div>
@@ -218,8 +225,8 @@ export default function ReportView({ report, datasetId }) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {report.statistics.univariate_metrics.map((um) => (
-                  <tr key={um.column_name} className="hover:bg-surface-accent/10 transition-colors">
+                {report.statistics.univariate_metrics.map((um, idx) => (
+                  <tr key={`${um.column_name}-${idx}`} className="hover:bg-surface-accent/10 transition-colors">
                     <td className="py-2.5 px-3 font-semibold text-text-primary">{um.column_name}</td>
                     <td className="py-2.5 px-3 text-text-secondary">{um.mean.toLocaleString()}</td>
                     <td className="py-2.5 px-3 text-text-secondary">{um.median.toLocaleString()}</td>

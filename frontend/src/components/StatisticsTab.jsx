@@ -52,8 +52,8 @@ export default function StatisticsTab({ report }) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#CEAB93]/30 bg-white/70 font-mono">
-                {statistics.univariate_metrics.map((um) => (
-                  <tr key={um.column_name} className="hover:bg-white/95 transition-colors">
+                {statistics.univariate_metrics.map((um, idx) => (
+                  <tr key={`${um.column_name}-${idx}`} className="hover:bg-white/95 transition-colors">
                     <td className="py-3 px-4 font-bold text-[#3E2723]">{um.column_name}</td>
                     <td className="py-3 px-4 text-[#3E2723] font-semibold">{um.mean.toLocaleString()}</td>
                     <td className="py-3 px-4 text-[#7D5A44]">{um.median.toLocaleString()}</td>
@@ -87,7 +87,7 @@ export default function StatisticsTab({ report }) {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
             {statistics.correlation_results.map((cp, idx) => (
               <div
-                key={idx}
+                key={`${cp.col1}-${cp.col2}-${idx}`}
                 className="p-4 md:p-5 rounded-2xl bg-white/80 border border-[#CEAB93]/40 flex items-center justify-between text-xs shadow-sm hover:border-[#AD8B73] transition-colors"
               >
                 <div className="space-y-1">
@@ -137,13 +137,19 @@ export default function StatisticsTab({ report }) {
           <div className="space-y-4">
             {sql_results.results.map((sq, idx) => (
               <div
-                key={idx}
+                key={`${sq.query_name || 'sql'}-${idx}`}
                 className="p-5 rounded-2xl bg-white/80 border border-[#CEAB93]/40 space-y-3.5 text-xs shadow-sm hover:border-[#AD8B73] transition-colors"
               >
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <div className="flex items-center space-x-2.5">
                     <span className="font-mono font-extrabold text-sm text-[#3E2723]">{sq.query_name}</span>
-                    <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-[#AD8B73]/15 text-[#3E2723] border border-[#CEAB93]/60 font-bold uppercase font-mono">
+                    <span className={`text-[10px] px-2.5 py-0.5 rounded-full font-bold uppercase font-mono border ${
+                      sq.execution_status === 'success'
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
+                        : sq.execution_status === 'failed'
+                        ? 'bg-rose-50 text-rose-700 border-rose-300'
+                        : 'bg-[#AD8B73]/15 text-[#3E2723] border-[#CEAB93]/60'
+                    }`}>
                       {sq.execution_status}
                     </span>
                   </div>
@@ -158,6 +164,12 @@ export default function StatisticsTab({ report }) {
 
                 <p className="text-[#7D5A44] font-normal">{sq.purpose}</p>
 
+                {sq.error_message && (
+                  <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-[11px] font-mono">
+                    <span className="font-bold">Error: </span>{sq.error_message}
+                  </div>
+                )}
+
                 <div className="p-4 rounded-xl bg-[#2C1810] font-mono text-[11px] text-[#FFFBE9] overflow-x-auto shadow-inner border border-[#3E2723]">
                   <code>{sq.sql}</code>
                 </div>
@@ -167,16 +179,16 @@ export default function StatisticsTab({ report }) {
                     <table className="w-full text-left text-[11px] font-mono">
                       <thead className="bg-white border-b border-[#CEAB93]/40 text-[#3E2723] font-bold">
                         <tr>
-                          {sq.columns.map((c) => (
-                            <th key={c} className="py-2 px-3">{c}</th>
+                          {sq.columns.map((c, cIdx) => (
+                            <th key={`${c}-${cIdx}`} className="py-2 px-3">{c}</th>
                           ))}
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-[#CEAB93]/30 bg-white/70">
                         {sq.rows.slice(0, 4).map((r, rIdx) => (
                           <tr key={rIdx} className="hover:bg-white/95">
-                            {sq.columns.map((c) => (
-                              <td key={c} className="py-2 px-3 text-[#3E2723]">
+                            {sq.columns.map((c, cIdx) => (
+                              <td key={`${c}-${cIdx}`} className="py-2 px-3 text-[#3E2723]">
                                 {r[c] !== null ? String(r[c]) : '—'}
                               </td>
                             ))}

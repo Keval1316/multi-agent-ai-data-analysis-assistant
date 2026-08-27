@@ -1,4 +1,6 @@
-from typing import Dict, Optional
+import json
+from pathlib import Path
+from typing import Dict, Optional, List
 import pandas as pd
 from backend.app.core.logging import logger
 from backend.app.models.report import AnalysisReport
@@ -16,36 +18,96 @@ from backend.app.services.visualization.chart_generator import ChartGenerator
 from backend.app.agents.revise_insights import InsightRevisionOrchestrator
 from backend.app.agents.generate_report import ReportGenerationAgent
 from backend.app.services.ingestion.duckdb_manager import duckdb_manager
-
-
 from backend.app.services.cleaning.cleaner import DataCleaner, CleaningSummary
+
+CACHE_DIR = Path(__file__).resolve().parent.parent.parent.parent / ".cache"
+REPORTS_CACHE_DIR = CACHE_DIR / "reports"
+CLEANED_CACHE_DIR = CACHE_DIR / "cleaned"
+
+REPORTS_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+CLEANED_CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
 
 class ReportBuilder:
-    """Manages full end-to-end report generation pipeline and in-memory caching."""
+    """Manages full end-to-end report generation pipeline and in-memory + disk caching."""
 
     _cached_reports: Dict[str, AnalysisReport] = {}
     _cached_cleaned_dfs: Dict[str, pd.DataFrame] = {}
 
     @classmethod
     def get_report(cls, dataset_id: str) -> Optional[AnalysisReport]:
-        return cls._cached_reports.get(dataset_id)
+        if dataset_id in cls._cached_reports:
+            return cls._cached_reports[dataset_id]
+        
+        # Check disk cache
+        try:
+            report_file = REPORTS_CACHE_DIR / f"{dataset_id}.json"
+            if report_file.exists():
+                with open(report_file, "r", encoding="utf-8") as f:
+                    report = AnalysisReport.model_validate_json(f.read())
+                    cls._cached_reports[dataset_id] = report
+                    return report
+        except Exception as e:
+            logger.warning(f"Failed to read report '{dataset_id}' from disk cache: {e}")
+
+        return None
 
     @classmethod
     def cache_report(cls, report: AnalysisReport):
         cls._cached_reports[report.dataset_id] = report
+        try:
+            REPORTS_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+            report_file = REPORTS_CACHE_DIR / f"{report.dataset_id}.json"
+            with open(report_file, "w", encoding="utf-8") as f:
+                f.write(report.model_dump_json(indent=2))
+        except Exception as e:
+            logger.warning(f"Failed to persist report '{report.dataset_id}' to disk cache: {e}")
 
     @classmethod
     def get_cleaned_df(cls, dataset_id: str) -> Optional[pd.DataFrame]:
-        return cls._cached_cleaned_dfs.get(dataset_id)
+        if dataset_id in cls._cached_cleaned_dfs:
+            return cls._cached_cleaned_dfs[dataset_id]
+
+        # Check disk cache
+        try:
+            csv_file = CLEANED_CACHE_DIR / f"{dataset_id}.csv"
+            if csv_file.exists():
+                df = pd.read_csv(csv_file)
+                cls._cached_cleaned_dfs[dataset_id] = df
+                # Re-register into DuckDB if needed
+                tbl = duckdb_manager.generate_table_name(dataset_id)
+                if not duckdb_manager.table_exists(tbl):
+                    duckdb_manager.register_dataframe(df, dataset_id, tbl)
+                return df
+        except Exception as e:
+            logger.warning(f"Failed to read cleaned df '{dataset_id}' from disk cache: {e}")
+
+        return None
 
     @classmethod
     def cache_cleaned_df(cls, dataset_id: str, df: pd.DataFrame):
         cls._cached_cleaned_dfs[dataset_id] = df
+        try:
+            CLEANED_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+            csv_file = CLEANED_CACHE_DIR / f"{dataset_id}.csv"
+            df.to_csv(csv_file, index=False)
+        except Exception as e:
+            logger.warning(f"Failed to persist cleaned df for '{dataset_id}' to disk cache: {e}")
 
     @classmethod
     def list_history(cls):
         """Returns summarized metadata of all cached analysis reports ordered most recent first."""
+        # Sync disk cache into memory
+        try:
+            if REPORTS_CACHE_DIR.exists():
+                for f in REPORTS_CACHE_DIR.glob("*.json"):
+                    did = f.stem
+                    if did not in cls._cached_reports:
+                        with open(f, "r", encoding="utf-8") as rf:
+                            cls._cached_reports[did] = AnalysisReport.model_validate_json(rf.read())
+        except Exception as e:
+            logger.warning(f"Error syncing history from disk cache: {e}")
+
         history = []
         for r in reversed(list(cls._cached_reports.values())):
             history.append({
@@ -67,18 +129,35 @@ class ReportBuilder:
 
     @classmethod
     def delete_report(cls, dataset_id: str) -> bool:
-        """Deletes a cached report and cleans up any related DuckDB table."""
+        """Deletes a cached report and cleans up any related DuckDB table and disk cache."""
+        deleted = False
         if dataset_id in cls._cached_reports:
             del cls._cached_reports[dataset_id]
-            if dataset_id in cls._cached_cleaned_dfs:
-                del cls._cached_cleaned_dfs[dataset_id]
-            try:
-                tbl = duckdb_manager.generate_table_name(dataset_id)
-                duckdb_manager.drop_table(tbl)
-            except Exception as e:
-                logger.warning(f"Failed to drop DuckDB table for '{dataset_id}': {e}")
-            return True
-        return False
+            deleted = True
+        if dataset_id in cls._cached_cleaned_dfs:
+            del cls._cached_cleaned_dfs[dataset_id]
+            deleted = True
+
+        # Delete from disk cache
+        try:
+            report_file = REPORTS_CACHE_DIR / f"{dataset_id}.json"
+            if report_file.exists():
+                report_file.unlink()
+                deleted = True
+            csv_file = CLEANED_CACHE_DIR / f"{dataset_id}.csv"
+            if csv_file.exists():
+                csv_file.unlink()
+                deleted = True
+        except Exception as e:
+            logger.warning(f"Failed to delete disk files for '{dataset_id}': {e}")
+
+        try:
+            tbl = duckdb_manager.generate_table_name(dataset_id)
+            duckdb_manager.drop_table(tbl)
+        except Exception as e:
+            logger.warning(f"Failed to drop DuckDB table for '{dataset_id}': {e}")
+
+        return deleted
 
     @classmethod
     def build_report_from_dataset(

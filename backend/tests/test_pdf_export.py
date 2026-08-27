@@ -42,3 +42,30 @@ def test_api_download_pdf_endpoint(client, clean_report):
     assert res.headers["content-type"] == "application/pdf"
     assert "attachment; filename=" in res.headers["content-disposition"]
     assert res.content.startswith(b"%PDF-")
+
+
+def test_api_post_pdf_endpoint(client, clean_report):
+    _, report = clean_report
+    # Send full JSON report payload to POST /api/dataset/report/pdf
+    payload = report.model_dump(mode="json")
+    res = client.post("/api/dataset/report/pdf", json=payload)
+
+    assert res.status_code == 200
+    assert res.headers["content-type"] == "application/pdf"
+    assert "attachment; filename=" in res.headers["content-disposition"]
+    assert res.content.startswith(b"%PDF-")
+
+
+def test_pdf_reload_recovery_from_disk_cache(client, clean_report):
+    dataset_id, report = clean_report
+    # Simulate server restart by clearing in-memory caches and DuckDB table
+    ReportBuilder._cached_reports.clear()
+    ReportBuilder._cached_cleaned_dfs.clear()
+    tbl = duckdb_manager.generate_table_name(dataset_id)
+    duckdb_manager.drop_table(tbl)
+
+    # Calling GET should seamlessly recover report from disk cache without 404!
+    res = client.get(f"/api/dataset/{dataset_id}/report/pdf")
+    assert res.status_code == 200
+    assert res.headers["content-type"] == "application/pdf"
+    assert res.content.startswith(b"%PDF-")

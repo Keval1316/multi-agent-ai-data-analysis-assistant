@@ -1,9 +1,9 @@
 import React, { useEffect, useRef } from 'react';
 
 /**
- * Beautiful, lightweight Canvas-based snowfall particle animation.
- * Medium quantity snowflakes drifting gracefully from top-left to bottom-right.
- * Theme color: #CEAB93 (warm beige/caramel tone).
+ * Beautiful, high-performance Canvas-based snowfall particle animation.
+ * Features delicate #CEAB93 snowflakes drifting smoothly from top-left to bottom-right.
+ * Optimized with high-DPI scaling, organic sway, and micro-crystal shimmer.
  */
 export default function SnowfallBackground() {
   const canvasRef = useRef(null);
@@ -14,32 +14,49 @@ export default function SnowfallBackground() {
 
     const ctx = canvas.getContext('2d');
     let animationFrameId;
-    let width = (canvas.width = window.innerWidth);
-    let height = (canvas.height = window.innerHeight);
+    let width = window.innerWidth;
+    let height = window.innerHeight;
 
-    const handleResize = () => {
+    const setCanvasSize = () => {
       if (!canvas) return;
-      width = canvas.width = window.innerWidth;
-      height = canvas.height = window.innerHeight;
+      const dpr = window.devicePixelRatio || 1;
+      width = window.innerWidth;
+      height = window.innerHeight;
+      canvas.width = width * dpr;
+      canvas.height = height * dpr;
+      canvas.style.width = `${width}px`;
+      canvas.style.height = `${height}px`;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     };
 
-    window.addEventListener('resize', handleResize);
+    setCanvasSize();
+    window.addEventListener('resize', setCanvasSize);
 
-    // Medium quantity of snowflakes (~55 flakes for optimal balance of elegance and performance)
-    const flakeCount = Math.floor(Math.min(Math.max(width / 24, 40), 75));
+    // Subtle, light quantity of snowflakes (~25-45 flakes for clean minimalism)
+    const flakeCount = Math.floor(Math.min(Math.max(width / 40, 25), 45));
     const flakes = [];
+
+    // Curated color palette anchored on #CEAB93
+    const colors = [
+      'rgba(206, 171, 147, ', // #CEAB93 Primary warm caramel
+      'rgba(206, 171, 147, ', // #CEAB93 Primary warm caramel
+      'rgba(173, 139, 115, ', // #AD8B73 Accent medium caramel
+      'rgba(227, 202, 165, ', // #E3CAA5 Light cream
+    ];
 
     for (let i = 0; i < flakeCount; i++) {
       flakes.push({
-        x: Math.random() * (width + 300) - 200,
-        y: Math.random() * (height + 200) - 100,
-        radius: Math.random() * 2.4 + 1.2, // Delicate small sizes (1.2px to 3.6px)
-        opacity: Math.random() * 0.55 + 0.3, // Soft translucent opacities (0.3 to 0.85)
-        speedY: Math.random() * 1.4 + 0.8, // Downward velocity
-        speedX: Math.random() * 1.2 + 0.7, // Rightward drift (top-left -> bottom-right)
-        swaySpeed: Math.random() * 0.02 + 0.008,
+        x: Math.random() * (width + 400) - 200,
+        y: Math.random() * (height + 300) - 150,
+        radius: Math.random() * 2.2 + 1.2, // Small delicate size (1.2px to 3.4px)
+        opacity: Math.random() * 0.45 + 0.45, // Crisp visible opacity (0.45 to 0.90)
+        speedY: Math.random() * 1.3 + 0.75, // Downward velocity
+        speedX: Math.random() * 1.1 + 0.65, // Rightward drift (top-left -> bottom-right)
+        swaySpeed: Math.random() * 0.018 + 0.006,
         swayOffset: Math.random() * Math.PI * 2,
-        swayAmplitude: Math.random() * 0.8 + 0.3
+        swayAmplitude: Math.random() * 0.8 + 0.25,
+        colorBase: colors[i % colors.length],
+        isCrystal: i % 6 === 0 // 16% micro sparkle crystals
       });
     }
 
@@ -52,27 +69,47 @@ export default function SnowfallBackground() {
       for (let i = 0; i < flakes.length; i++) {
         const flake = flakes[i];
 
-        // Update position: diagonal drift from top-left to bottom-right with organic gentle sway
+        // Move diagonally from top-left to bottom-right with organic lateral swaying
         flake.y += flake.speedY;
         flake.x += flake.speedX + Math.sin(time * flake.swaySpeed + flake.swayOffset) * flake.swayAmplitude;
 
-        // Wrap around boundaries seamlessly
-        if (flake.y > height + 20) {
-          flake.y = -20;
-          flake.x = Math.random() * (width + 200) - 200;
+        // Wrap around boundaries
+        if (flake.y > height + 25) {
+          flake.y = -25;
+          flake.x = Math.random() * (width + 250) - 250;
         }
-        if (flake.x > width + 20) {
-          flake.x = -20;
-          flake.y = Math.random() * (height + 200) - 100;
+        if (flake.x > width + 25) {
+          flake.x = -25;
+          flake.y = Math.random() * (height + 250) - 150;
         }
 
-        // Draw delicate snowflake (#CEAB93 -> RGB: 206, 171, 147)
-        ctx.beginPath();
-        ctx.arc(flake.x, flake.y, flake.radius, 0, Math.PI * 2, false);
-        ctx.fillStyle = `rgba(206, 171, 147, ${flake.opacity})`;
-        ctx.shadowColor = 'rgba(206, 171, 147, 0.4)';
-        ctx.shadowBlur = flake.radius > 2.2 ? 3 : 1;
-        ctx.fill();
+        ctx.save();
+        ctx.fillStyle = `${flake.colorBase}${flake.opacity})`;
+        ctx.shadowColor = 'rgba(206, 171, 147, 0.65)';
+        ctx.shadowBlur = flake.radius > 2.2 ? 4 : 2;
+
+        if (flake.isCrystal && flake.radius > 1.8) {
+          // Draw delicate 4-pointed sparkle snowflake
+          const r = flake.radius * 1.4;
+          ctx.beginPath();
+          ctx.arc(flake.x, flake.y, flake.radius * 0.6, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.strokeStyle = `${flake.colorBase}${flake.opacity * 0.95})`;
+          ctx.lineWidth = 0.9;
+          ctx.beginPath();
+          ctx.moveTo(flake.x - r, flake.y);
+          ctx.lineTo(flake.x + r, flake.y);
+          ctx.moveTo(flake.x, flake.y - r);
+          ctx.lineTo(flake.x, flake.y + r);
+          ctx.stroke();
+        } else {
+          // Draw delicate round snowflake dot
+          ctx.beginPath();
+          ctx.arc(flake.x, flake.y, flake.radius, 0, Math.PI * 2, false);
+          ctx.fill();
+        }
+        ctx.restore();
       }
 
       animationFrameId = requestAnimationFrame(render);
@@ -81,7 +118,7 @@ export default function SnowfallBackground() {
     render();
 
     return () => {
-      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('resize', setCanvasSize);
       cancelAnimationFrame(animationFrameId);
     };
   }, []);
@@ -89,8 +126,16 @@ export default function SnowfallBackground() {
   return (
     <canvas
       ref={canvasRef}
-      className="fixed inset-0 pointer-events-none -z-10 w-full h-full"
-      style={{ opacity: 0.9 }}
+      className="fixed inset-0 pointer-events-none w-full h-full"
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        width: '100vw',
+        height: '100vh',
+        pointerEvents: 'none',
+        zIndex: 1
+      }}
       aria-hidden="true"
     />
   );

@@ -347,9 +347,9 @@ ORD-2010,Hank Green,electronics,Mouse,2,25.00,0,50.00,2025-01-10,False,West`;
       <SnowfallBackground />
 
       {/* Background Ambient Glowing Orbs */}
-      <div className="fixed top-0 left-1/4 w-[650px] h-[650px] bg-[#E3CAA5]/30 rounded-full blur-[120px] pointer-events-none -z-10 animate-pulse" style={{ animationDuration: '8s' }} />
-      <div className="fixed bottom-10 right-1/4 w-[550px] h-[550px] bg-[#AD8B73]/20 rounded-full blur-[140px] pointer-events-none -z-10" />
-      <div className="fixed inset-0 bg-dot-grid pointer-events-none -z-10 opacity-60" />
+      <div className="fixed top-0 left-1/4 w-[650px] h-[650px] bg-[#E3CAA5]/30 rounded-full blur-[120px] pointer-events-none z-0 animate-pulse" style={{ animationDuration: '8s' }} />
+      <div className="fixed bottom-10 right-1/4 w-[550px] h-[550px] bg-[#AD8B73]/20 rounded-full blur-[140px] pointer-events-none z-0" />
+      <div className="fixed inset-0 bg-dot-grid pointer-events-none z-0 opacity-60" />
 
       {/* History Sidebar Drawer */}
       <HistorySidebar
@@ -421,7 +421,7 @@ ORD-2010,Hank Green,electronics,Mouse,2,25.00,0,50.00,2025-01-10,False,West`;
       </header>
 
       {/* 2. Main Content Body */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-10 md:py-14">
+      <main className="relative z-10 flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-10 md:py-14">
         <AnimatePresence mode="wait">
           {/* STAGE 1: HERO & UPLOAD */}
           {stage === 'upload' && (
@@ -651,10 +651,10 @@ ORD-2010,Hank Green,electronics,Mouse,2,25.00,0,50.00,2025-01-10,False,West`;
               </div>
 
               {/* Navigation Segmented Tab Bar */}
-              <div className="flex items-center space-x-2 overflow-x-auto pb-1 text-xs font-bold font-sans">
+              <div className="flex items-center space-x-1.5 md:space-x-2 overflow-x-auto pb-1 text-xs font-bold font-sans no-scrollbar">
                 {[
                   { id: 'overview', label: 'Executive Overview', icon: Sparkles },
-                  { id: 'cleandata', label: 'Cleaned Dataset & Export', icon: FileSpreadsheet },
+                  { id: 'cleandata', label: 'Cleaned Dataset', icon: FileSpreadsheet },
                   { id: 'quality', label: 'Data Quality & Schema', icon: ShieldCheck },
                   { id: 'statistics', label: 'Statistics & SQL', icon: Database },
                   { id: 'visualizations', label: 'Interactive Visuals', icon: BarChart3 },
@@ -667,13 +667,13 @@ ORD-2010,Hank Green,electronics,Mouse,2,25.00,0,50.00,2025-01-10,False,West`;
                     <button
                       key={tab.id}
                       onClick={() => setActiveTab(tab.id)}
-                      className={`flex items-center space-x-2 px-4 py-3 rounded-2xl transition-all duration-200 cursor-pointer whitespace-nowrap ${
+                      className={`flex items-center space-x-1.5 md:space-x-2 px-3 md:px-4 py-2.5 md:py-3 rounded-2xl transition-all duration-200 cursor-pointer whitespace-nowrap ${
                         isActive
                           ? 'bg-gradient-to-r from-[#AD8B73] to-[#3E2723] text-white shadow-md shadow-[#AD8B73]/20 scale-100'
                           : 'glass-card text-[#3E2723] hover:bg-white/95 border-[#CEAB93]/40'
                       }`}
                     >
-                      <Icon className={`w-4 h-4 ${isActive ? 'text-white' : 'text-[#AD8B73]'}`} />
+                      <Icon className={`w-3.5 h-3.5 md:w-4 md:h-4 ${isActive ? 'text-white' : 'text-[#AD8B73]'}`} />
                       <span>{tab.label}</span>
                     </button>
                   );

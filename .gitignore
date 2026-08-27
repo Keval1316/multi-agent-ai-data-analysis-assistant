@@ -51,6 +51,7 @@ Thumbs.db
 # Temporary uploads & reports
 temp_uploads/
 scratch/
+.cache/
 generated_reports/*.pdf
 *.duckdb
 *.duckdb.wal

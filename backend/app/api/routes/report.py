@@ -50,6 +50,29 @@ async def get_analysis_report(dataset_id: str):
         raise HTTPException(status_code=500, detail=f"Failed to generate analysis report: {str(e)}")
 
 
+@router.post("/report/pdf")
+@router.post("/{dataset_id}/report/pdf")
+async def generate_pdf_from_payload(report: AnalysisReport, dataset_id: str = ""):
+    """Generates and streams a publication-ready PDF directly from an AnalysisReport JSON payload."""
+    target_id = report.dataset_id or dataset_id or "export"
+    logger.info(f"Received direct POST request for PDF generation on dataset '{target_id}'")
+    try:
+        ReportBuilder.cache_report(report)
+        pdf_bytes = PDFExporter.generate_pdf(report)
+        filename = f"analysis_report_{target_id}.pdf"
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"',
+                "Content-Length": str(len(pdf_bytes))
+            }
+        )
+    except Exception as e:
+        logger.error(f"Error rendering PDF from payload for '{target_id}': {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to render PDF: {str(e)}")
+
+
 @router.get("/{dataset_id}/report/pdf")
 async def download_pdf_report(dataset_id: str):
     """Generates and streams a publication-ready PDF download for the dataset report."""
@@ -59,10 +82,16 @@ async def download_pdf_report(dataset_id: str):
     report = ReportBuilder.get_report(dataset_id)
     if not report:
         tbl = duckdb_manager.generate_table_name(dataset_id)
-        if not duckdb_manager.table_exists(tbl):
-            raise HTTPException(status_code=404, detail=f"Dataset '{dataset_id}' not found.")
-        df = duckdb_manager.get_dataframe(tbl)
-        report = ReportBuilder.build_report_from_dataset(df, dataset_id, tbl, f"{dataset_id}.csv")
+        if duckdb_manager.table_exists(tbl):
+            df = duckdb_manager.get_dataframe(tbl)
+            report = ReportBuilder.build_report_from_dataset(df, dataset_id, tbl, f"{dataset_id}.csv")
+        else:
+            cleaned_df = ReportBuilder.get_cleaned_df(dataset_id)
+            if cleaned_df is not None:
+                report = ReportBuilder.build_report_from_dataset(cleaned_df, dataset_id, tbl, f"{dataset_id}.csv")
+
+    if not report:
+        raise HTTPException(status_code=404, detail=f"Dataset '{dataset_id}' not found.")
 
     try:
         pdf_bytes = PDFExporter.generate_pdf(report)

@@ -75,7 +75,14 @@ class ReportGenerationAgent:
         cleaning_text = "Standard data hygiene verified; zero critical formatting anomalies."
         if cleaning_summary:
             t_list = cleaning_summary.get("transformations", [])
-            cleaning_text = f"Purged {cleaning_summary.get('duplicates_removed', 0)} duplicates, imputed {cleaning_summary.get('nulls_imputed', 0)} nulls. Transformations: {'; '.join(t_list[:4])}"
+            cleaning_text = (
+                f"Purged {cleaning_summary.get('duplicates_removed', 0)} duplicate records, "
+                f"corrected {cleaning_summary.get('out_of_range_corrected', 0)} out-of-range values, "
+                f"derived {cleaning_summary.get('nulls_derived', 0)} missing values via cross-field logic, "
+                f"reconciled {cleaning_summary.get('cross_field_reconciled', 0)} contradictory field entries, "
+                f"and imputed {cleaning_summary.get('nulls_imputed', 0)} remaining nulls. "
+                f"Key transformations: {'; '.join(t_list[:5])}"
+            )
 
         system_prompt = (
             "You are a Chief AI Analytics Officer and Lead Data Strategist. "

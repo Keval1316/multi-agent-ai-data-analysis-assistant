@@ -50,23 +50,40 @@ class MockLLMProvider(LLMProvider):
             domain = "Quantitative Multi-Variable Analysis"
             entity = "Data Record"
 
-        # Extract column metadata from prompt
-        col_matches = re.findall(r"-\s*'([^']+)'\s*\(([^,]+),\s*([^)]+)\)", prompt_text)
-        if col_matches:
-            numeric_cols = [c[0] for c in col_matches if any(t in c[1].lower() or t in c[2].lower() for t in ["numeric", "int", "float", "double", "decimal", "moment"])]
-            cat_cols = [c[0] for c in col_matches if any(t in c[1].lower() or t in c[2].lower() for t in ["categorical", "string", "object", "text", "segment"])]
-        else:
-            all_cols = re.findall(r"['\"]([a-zA-Z0-9_]+)['\"]", prompt_text)
-            numeric_cols = [c for c in all_cols if any(k in c.lower() for k in ["revenue", "price", "quantity", "cost", "score", "rate", "amount", "age", "salary", "value", "total", "count", "metric", "weight", "height", "duration", "hours", "points", "gpa"])]
-            cat_cols = [c for c in all_cols if c not in numeric_cols and any(k in c.lower() for k in ["region", "category", "product", "status", "country", "segment", "type", "dept", "department", "grade", "role", "gender", "class", "name", "city", "state"])]
-            if not numeric_cols and all_cols:
-                numeric_cols = [all_cols[0]]
-            if not cat_cols and len(all_cols) > 1:
-                cat_cols = [all_cols[1]]
+        # Extract table name if present
+        table_match = re.search(r"table\s+['\"]?([a-zA-Z0-9_]+)['\"]?", prompt_text, re.IGNORECASE)
+        tbl = table_match.group(1) if table_match else "dataset"
 
-        primary_num = numeric_cols[0] if numeric_cols else "primary_metric"
-        secondary_num = numeric_cols[1] if len(numeric_cols) > 1 else primary_num
-        primary_cat = cat_cols[0] if cat_cols else "segment_category"
+        # Extract column metadata from prompt (handles with or without leading dash '-')
+        col_matches = re.findall(r"['\"]([^'\"]+)['\"]\s*\(([^,]+),\s*([^)]+)\)", prompt_text)
+        # Filter out table name if captured accidentally
+        valid_col_matches = [c for c in col_matches if c[0] != tbl and not c[0].startswith("dataset_")]
+
+        if valid_col_matches:
+            numeric_cols = [c[0] for c in valid_col_matches if any(t in c[1].lower() or t in c[2].lower() for t in ["numeric", "int", "float", "double", "decimal", "moment", "real", "hugeint"])]
+            cat_cols = [c[0] for c in valid_col_matches if c[0] not in numeric_cols]
+        else:
+            all_raw = re.findall(r"['\"]([a-zA-Z0-9_]+)['\"]", prompt_text)
+            ignore_tokens = {tbl, "dataset", "dataset_id", "generate_sql", "true", "false", "null", "none", "table"}
+            all_cols = [c for c in all_raw if c.lower() not in ignore_tokens and not c.startswith("dataset_") and not c.startswith("top_") and not c.startswith("overall_")]
+            numeric_cols = [c for c in all_cols if any(k in c.lower() for k in ["revenue", "price", "quantity", "cost", "score", "rate", "amount", "age", "salary", "value", "total", "count", "metric", "weight", "height", "duration", "hours", "points", "gpa"])]
+            cat_cols = [c for c in all_cols if c not in numeric_cols and any(k in c.lower() for k in ["region", "category", "product", "status", "country", "segment", "type", "dept", "department", "grade", "role", "gender", "class", "name", "city", "state", "page"])]
+            if not numeric_cols and all_cols:
+                # If only 1 column and it's not a known cat keyword, check if other
+                if len(all_cols) == 1 and all_cols[0] in cat_cols:
+                    pass
+                else:
+                    cat_cols = [c for c in all_cols if c not in numeric_cols]
+            if not cat_cols and len(all_cols) > len(numeric_cols):
+                cat_cols = [c for c in all_cols if c not in numeric_cols]
+
+        primary_num = numeric_cols[0] if numeric_cols else None
+        secondary_num = numeric_cols[1] if len(numeric_cols) > 1 else (primary_num or "primary_metric")
+        primary_cat = cat_cols[0] if cat_cols else (numeric_cols[0] if numeric_cols else "segment_category")
+
+        # Fallback names for understanding & plan
+        safe_num = primary_num or "total_volume"
+        safe_cat = primary_cat or "segment"
 
         # 1. DatasetUnderstanding
         if response_model == DatasetUnderstanding:
@@ -99,15 +116,15 @@ class MockLLMProvider(LLMProvider):
                     ))
             else:
                 dimensions.append(DimensionCandidate(
-                    column_name=primary_cat,
-                    dimension_name=primary_cat.replace('_', ' ').title(),
+                    column_name=safe_cat,
+                    dimension_name=safe_cat.replace('_', ' ').title(),
                     role="segmentation"
                 ))
 
             core_q = [
-                f"How is {primary_num.replace('_', ' ')} distributed across {primary_cat.replace('_', ' ')} segments?",
-                f"Is there a statistically significant association between {primary_num.replace('_', ' ')} and {secondary_num.replace('_', ' ')}?",
-                f"What data quality anomalies, skewness, or outliers characterize {primary_num.replace('_', ' ')}?"
+                f"How is {safe_num.replace('_', ' ')} distributed across {safe_cat.replace('_', ' ')} segments?",
+                f"Is there a statistically significant association between {safe_num.replace('_', ' ')} and {secondary_num.replace('_', ' ')}?",
+                f"What data quality anomalies, skewness, or outliers characterize {safe_num.replace('_', ' ')}?"
             ]
 
             return DatasetUnderstanding(
@@ -124,74 +141,104 @@ class MockLLMProvider(LLMProvider):
         if response_model == AnalysisPlan:
             group_plans = [
                 GroupByAnalysisPlan(
-                    group_column=primary_cat,
-                    metric_column=primary_num,
-                    aggregation="SUM" if "rate" not in primary_num and "score" not in primary_num else "AVG",
-                    purpose=f"Evaluate {primary_num} performance across {primary_cat}"
+                    group_column=safe_cat,
+                    metric_column=safe_num,
+                    aggregation="SUM" if "rate" not in safe_num and "score" not in safe_num else "AVG",
+                    purpose=f"Evaluate {safe_num} performance across {safe_cat}"
                 )
             ]
 
             sql_goals = [
                 SQLQueryGoal(
-                    name=f"top_{primary_cat}_by_{primary_num}",
-                    purpose=f"Aggregate {primary_num} grouped by {primary_cat} in descending order",
-                    columns_needed=[primary_cat, primary_num]
+                    name=f"top_{safe_cat}_by_{safe_num}",
+                    purpose=f"Aggregate {safe_num} grouped by {safe_cat} in descending order",
+                    columns_needed=[safe_cat, safe_num] if primary_num else [safe_cat]
                 ),
                 SQLQueryGoal(
                     name="overall_metric_summary",
-                    purpose=f"Compute dataset-level summary KPIs (total rows, avg/min/max {primary_num})",
-                    columns_needed=[primary_num]
+                    purpose=f"Compute dataset-level summary KPIs (total rows, avg/min/max {safe_num})",
+                    columns_needed=[safe_num] if primary_num else []
                 )
             ]
 
             charts = [
                 RecommendedChart(
                     chart_type="bar",
-                    x_column=primary_cat,
+                    x_column=safe_cat,
                     y_column=primary_num,
-                    title=f"Total {primary_num.replace('_', ' ').title()} by {primary_cat.replace('_', ' ').title()}",
-                    purpose=f"Compare {primary_num} across {primary_cat} categories"
+                    title=f"Total {safe_num.replace('_', ' ').title()} by {safe_cat.replace('_', ' ').title()}",
+                    purpose=f"Compare {safe_num} across {safe_cat} categories"
                 ),
                 RecommendedChart(
                     chart_type="scatter" if len(numeric_cols) > 1 else "histogram",
-                    x_column=primary_num,
+                    x_column=safe_num,
                     y_column=secondary_num if len(numeric_cols) > 1 else None,
-                    title=f"{primary_num.replace('_', ' ').title()} vs {secondary_num.replace('_', ' ').title()}" if len(numeric_cols) > 1 else f"{primary_num.replace('_', ' ').title()} Distribution",
+                    title=f"{safe_num.replace('_', ' ').title()} vs {secondary_num.replace('_', ' ').title()}" if len(numeric_cols) > 1 else f"{safe_num.replace('_', ' ').title()} Distribution",
                     purpose="Explore statistical relationship and outliers"
                 )
             ]
 
             return AnalysisPlan(
                 primary_goal=f"Maximize empirical insights into {domain.lower()} performance drivers, distributions, and anomalies.",
-                descriptive_numeric_columns=numeric_cols[:4] if numeric_cols else [primary_num],
-                correlation_pairs=[[primary_num, secondary_num]] if len(numeric_cols) >= 2 else [],
+                descriptive_numeric_columns=numeric_cols[:4] if numeric_cols else [safe_num],
+                correlation_pairs=[[primary_num, secondary_num]] if len(numeric_cols) >= 2 and primary_num else [],
                 group_by_analyses=group_plans,
                 sql_query_goals=sql_goals,
-                pattern_detection_targets=[f"{primary_num} trends across {primary_cat}"],
+                pattern_detection_targets=[f"{safe_num} trends across {safe_cat}"],
                 recommended_charts=charts
             )  # type: ignore
 
         # 3. SQLGenerationResponse
         from backend.app.models.sql import SQLGenerationResponse, GeneratedSQLQuery
         if response_model == SQLGenerationResponse:
-            table_match = re.search(r"table\s+['\"]?([a-zA-Z0-9_]+)['\"]?", prompt_text, re.IGNORECASE)
-            tbl = table_match.group(1) if table_match else "dataset"
-
-            agg_func = "SUM" if "rate" not in primary_num and "score" not in primary_num else "AVG"
-            queries = [
-                GeneratedSQLQuery(
+            queries = []
+            if primary_cat and primary_num:
+                agg_func = "SUM" if "rate" not in primary_num.lower() and "score" not in primary_num.lower() and "age" not in primary_num.lower() else "AVG"
+                queries.append(GeneratedSQLQuery(
                     name=f"top_{primary_cat}_by_{primary_num}",
-                    purpose=f"Aggregate total {primary_num} grouped by {primary_cat} in descending order",
-                    sql=f"SELECT {primary_cat}, {agg_func}({primary_num}) AS total_{primary_num}, COUNT(*) AS record_count FROM {tbl} GROUP BY {primary_cat} ORDER BY total_{primary_num} DESC LIMIT 10",
+                    purpose=f"Aggregate {agg_func.lower()} of {primary_num} grouped by {primary_cat} in descending order",
+                    sql=f'SELECT "{primary_cat}", {agg_func}("{primary_num}") AS total_{primary_num}, COUNT(*) AS record_count FROM "{tbl}" GROUP BY "{primary_cat}" ORDER BY total_{primary_num} DESC LIMIT 10',
                     expected_columns=[primary_cat, f"total_{primary_num}", "record_count"]
-                ),
-                GeneratedSQLQuery(
+                ))
+                queries.append(GeneratedSQLQuery(
                     name="overall_dataset_summary",
                     purpose=f"Compute overall average, min, and max for {primary_num}",
-                    sql=f"SELECT COUNT(*) AS total_records, AVG({primary_num}) AS avg_{primary_num}, MIN({primary_num}) AS min_{primary_num}, MAX({primary_num}) AS max_{primary_num} FROM {tbl}",
+                    sql=f'SELECT COUNT(*) AS total_records, AVG("{primary_num}") AS avg_{primary_num}, MIN("{primary_num}") AS min_{primary_num}, MAX("{primary_num}") AS max_{primary_num} FROM "{tbl}"',
                     expected_columns=["total_records", f"avg_{primary_num}", f"min_{primary_num}", f"max_{primary_num}"]
-                )
-            ]
+                ))
+            elif primary_cat:
+                queries.append(GeneratedSQLQuery(
+                    name=f"top_{primary_cat}_distribution",
+                    purpose=f"Frequency distribution of top {primary_cat} segments",
+                    sql=f'SELECT "{primary_cat}", COUNT(*) AS record_count FROM "{tbl}" GROUP BY "{primary_cat}" ORDER BY record_count DESC LIMIT 10',
+                    expected_columns=[primary_cat, "record_count"]
+                ))
+                queries.append(GeneratedSQLQuery(
+                    name="overall_dataset_summary",
+                    purpose="Dataset-level total record count and distinct categories",
+                    sql=f'SELECT COUNT(*) AS total_records, COUNT(DISTINCT "{primary_cat}") AS distinct_{primary_cat} FROM "{tbl}"',
+                    expected_columns=["total_records", f"distinct_{primary_cat}"]
+                ))
+            elif primary_num:
+                queries.append(GeneratedSQLQuery(
+                    name=f"{primary_num}_distribution_summary",
+                    purpose=f"Summary moments and distribution for {primary_num}",
+                    sql=f'SELECT COUNT(*) AS total_records, AVG("{primary_num}") AS avg_{primary_num}, MIN("{primary_num}") AS min_{primary_num}, MAX("{primary_num}") AS max_{primary_num} FROM "{tbl}"',
+                    expected_columns=["total_records", f"avg_{primary_num}", f"min_{primary_num}", f"max_{primary_num}"]
+                ))
+                queries.append(GeneratedSQLQuery(
+                    name=f"{primary_num}_summary_percentiles",
+                    purpose=f"Key percentiles for {primary_num}",
+                    sql=f'SELECT COUNT(*) AS total_records, MIN("{primary_num}") AS min_val, MAX("{primary_num}") AS max_val FROM "{tbl}"',
+                    expected_columns=["total_records", "min_val", "max_val"]
+                ))
+            else:
+                queries.append(GeneratedSQLQuery(
+                    name="overall_dataset_summary",
+                    purpose="Dataset-level total row count",
+                    sql=f'SELECT COUNT(*) AS total_records FROM "{tbl}"',
+                    expected_columns=["total_records"]
+                ))
             return SQLGenerationResponse(queries=queries)  # type: ignore
 
         # 4. InsightCollection

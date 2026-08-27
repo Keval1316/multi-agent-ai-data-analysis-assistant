@@ -300,8 +300,8 @@ export default function DatasetProfileView({ datasetId, onProceedToAnalysis }) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border font-mono text-[11px]">
-                {profile.column_profiles.map((col) => (
-                  <tr key={col.name} className="hover:bg-surface-accent/10 transition-colors">
+                {profile.column_profiles.map((col, idx) => (
+                  <tr key={`${col.name}-${idx}`} className="hover:bg-surface-accent/10 transition-colors">
                     <td className="px-4 py-3 font-semibold text-text-primary">
                       {col.name}
                     </td>
@@ -343,8 +343,8 @@ export default function DatasetProfileView({ datasetId, onProceedToAnalysis }) {
               <TrendingUp className="w-4 h-4 text-primary" />
               Numeric Column Summary
             </h4>
-            {profile.column_profiles.filter((c) => c.numeric_stats).map((col) => (
-              <div key={col.name} className="p-4 rounded-3xl bg-surface border border-border space-y-2 shadow-xs">
+            {profile.column_profiles.filter((c) => c.numeric_stats).map((col, idx) => (
+              <div key={`${col.name}-${idx}`} className="p-4 rounded-3xl bg-surface border border-border space-y-2 shadow-xs">
                 <div className="flex justify-between items-center border-b border-border pb-2">
                   <span className="font-mono text-xs font-bold text-text-primary">{col.name}</span>
                   <span className="text-[10px] text-text-secondary">Mean: {col.numeric_stats.mean.toFixed(2)}</span>
@@ -373,8 +373,8 @@ export default function DatasetProfileView({ datasetId, onProceedToAnalysis }) {
               <BarChart3 className="w-4 h-4 text-primary" />
               Categorical Frequencies (Top 5)
             </h4>
-            {profile.column_profiles.filter((c) => c.categorical_stats && c.categorical_stats.top_values.length > 0).map((col) => (
-              <div key={col.name} className="p-4 rounded-3xl bg-surface border border-border space-y-2 shadow-xs">
+            {profile.column_profiles.filter((c) => c.categorical_stats && c.categorical_stats.top_values.length > 0).map((col, idx) => (
+              <div key={`${col.name}-${idx}`} className="p-4 rounded-3xl bg-surface border border-border space-y-2 shadow-xs">
                 <div className="flex justify-between items-center border-b border-border pb-2">
                   <span className="font-mono text-xs font-bold text-text-primary">{col.name}</span>
                   <span className="text-[10px] text-text-secondary">{col.categorical_stats.unique_count} categories</span>

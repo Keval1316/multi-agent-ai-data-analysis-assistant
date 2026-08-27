@@ -165,8 +165,8 @@ export default function DataQualityTab({ report }) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#CEAB93]/30 bg-white/70">
-                {profile.column_profiles.map((col) => (
-                  <tr key={col.name} className="hover:bg-white/95 transition-colors">
+                {profile.column_profiles.map((col, idx) => (
+                  <tr key={`${col.name}-${idx}`} className="hover:bg-white/95 transition-colors">
                     <td className="py-3 px-4 font-bold text-[#3E2723] font-mono">{col.name}</td>
                     <td className="py-3 px-4">
                       <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono bg-[#AD8B73]/15 text-[#3E2723] border border-[#CEAB93]/60 font-bold">
