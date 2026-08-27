@@ -31,6 +31,7 @@ import InsightsTab from './components/InsightsTab';
 import ReportMarkdownTab from './components/ReportMarkdownTab';
 import HistorySidebar from './components/HistorySidebar';
 import CleanDataTab from './components/CleanDataTab';
+import SnowfallBackground from './components/SnowfallBackground';
 
 export default function App() {
   const [stage, setStage] = useState('upload'); // 'upload' | 'streaming' | 'dashboard'
@@ -342,6 +343,9 @@ ORD-2010,Hank Green,electronics,Mouse,2,25.00,0,50.00,2025-01-10,False,West`;
 
   return (
     <div className="min-h-screen bg-[#FFFBE9] text-[#3E2723] flex flex-col font-sans relative overflow-x-hidden">
+      {/* Delicate #CEAB93 Snowfall Background Animation */}
+      <SnowfallBackground />
+
       {/* Background Ambient Glowing Orbs */}
       <div className="fixed top-0 left-1/4 w-[650px] h-[650px] bg-[#E3CAA5]/30 rounded-full blur-[120px] pointer-events-none -z-10 animate-pulse" style={{ animationDuration: '8s' }} />
       <div className="fixed bottom-10 right-1/4 w-[550px] h-[550px] bg-[#AD8B73]/20 rounded-full blur-[140px] pointer-events-none -z-10" />
