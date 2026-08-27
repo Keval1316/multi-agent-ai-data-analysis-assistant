@@ -1,0 +1,21 @@
+order_id,customer_name,category,product,quantity,unit_price,discount_rate,total_revenue,order_date,is_returned,region
+ORD-1001,Alice Johnson,Electronics,Wireless Headphones,2,79.99,0.05,151.98,2025-01-15,False,North
+ORD-1002,Bob Smith,Furniture,Ergonomic Chair,1,249.50,0.10,224.55,2025-01-16,False,West
+ORD-1003,Charlie Davis,Office Supplies,Gel Pens 12-Pack,5,12.99,0.00,64.95,2025-01-18,False,East
+ORD-1004,Diana Miller,Electronics,Smart Watch,1,199.99,0.15,169.99,2025-01-20,True,South
+ORD-1005,Evan Wright,Furniture,Standing Desk,1,450.00,0.00,450.00,2025-01-22,False,North
+ORD-1006,Fiona Gallagher,Office Supplies,Notebook Set,3,15.50,0.00,46.50,2025-01-25,False,West
+ORD-1007,George Clark,Electronics,Bluetooth Speaker,2,45.00,0.05,85.50,2025-01-28,False,East
+ORD-1008,Hannah Abbott,Furniture,Bookshelf,1,120.00,0.10,108.00,2025-02-01,False,South
+ORD-1009,Ian Malcolm,Electronics,USB-C Hub,4,29.99,0.00,119.96,2025-02-03,False,North
+ORD-1010,Julia Roberts,Office Supplies,Desk Organizer,2,22.00,0.00,44.00,2025-02-05,False,West
+ORD-1011,Kevin Bacon,Electronics,Wireless Mouse,3,25.99,0.05,74.07,2025-02-07,False,East
+ORD-1012,Laura Croft,Furniture,Gaming Chair,1,299.99,0.20,239.99,2025-02-10,True,South
+ORD-1013,Michael Scott,Office Supplies,Paper Reams 500ct,10,8.50,0.10,76.50,2025-02-12,False,North
+ORD-1014,Nina Simone,Electronics,Mechanical Keyboard,1,110.00,0.00,110.00,2025-02-15,False,West
+ORD-1015,Oscar Martinez,Office Supplies,Stapler Heavy Duty,1,18.75,0.00,18.75,2025-02-18,False,East
+ORD-1016,Pam Beesly,Furniture,Desk Lamp,2,35.00,0.05,66.50,2025-02-20,False,South
+ORD-1017,Quentin Tarantino,Electronics,4K Monitor,1,349.99,0.10,314.99,2025-02-22,False,North
+ORD-1018,Rachel Green,Office Supplies,Whiteboard,1,55.00,0.00,55.00,2025-02-25,False,West
+ORD-1019,Steve Rogers,Furniture,Filing Cabinet,1,180.00,0.15,153.00,2025-02-27,False,East
+ORD-1020,Tony Stark,Electronics,VR Headset,2,499.99,0.05,949.98,2025-03-01,False,South

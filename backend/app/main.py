@@ -6,6 +6,7 @@ from backend.app.core.config import settings
 from backend.app.core.logging import logger
 from backend.app.core.exceptions import AppBaseException
 from backend.app.api.routes.health import router as health_router
+from backend.app.api.routes.upload import router as upload_router
 
 
 @asynccontextmanager
@@ -53,6 +54,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 # Include Routers
 app.include_router(health_router)
+app.include_router(upload_router)
 
 
 @app.get("/")

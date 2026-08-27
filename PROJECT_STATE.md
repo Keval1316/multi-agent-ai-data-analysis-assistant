@@ -1,13 +1,13 @@
 # PROJECT STATE
 
-Last updated: 2026-08-27 11:20
+Last updated: 2026-08-27 11:27
 
 ## Current Phase
-Phase 1: File upload and ingestion (Next)
+Phase 2: Dataset profiling and quality checking (Next)
 
 ## Completed Phases
 - [x] Phase 0: Repository scaffolding
-- [ ] Phase 1: File upload and ingestion
+- [x] Phase 1: File upload and ingestion
 - [ ] Phase 2: Dataset profiling and quality checking
 - [ ] Phase 3: LLM router and dataset understanding
 - [ ] Phase 4: Statistical and SQL analysis
@@ -20,21 +20,20 @@ Phase 1: File upload and ingestion (Next)
 - [ ] Phase 11: Deployment and documentation
 
 ## Key Decisions and Notes
-- **Design Palette Tokens**: Implemented exact required design palette tokens in Tailwind & CSS variables:
-  - Background: `#EDF1D6` (`--color-background`)
-  - Surface: `#FFFFFF` (`--color-surface`)
-  - Accent Surface: `#9DC08B` (`--color-surface-accent`)
-  - Primary Text: `#40513B` (`--color-text-primary`)
-  - Secondary Text: `#609966` (`--color-text-secondary`)
-  - Primary / Button: `#609966` (`--color-primary`)
-  - Primary Hover / Active: `#40513B` (`--color-primary-hover`)
-  - Border: `#9DC08B` (`--color-border`)
-- **Backend Architecture**: FastAPI with Pydantic v2 settings, modular routers, structured logging, centralized custom exceptions, and health endpoints.
-- **Frontend Architecture**: React 18 + Vite 5 + Tailwind CSS 3 + Framer Motion. Production build verified.
-- **Python Environment**: Configured Python 3.12 venv with LangGraph, DuckDB, pandas, numpy, scipy, statsmodels, plotly, jinja2, openpyxl, reportlab, httpx, pytest, groq, and google-genai.
+- **File Validation & Ingestion**:
+  - `FileValidator` enforces extension checks (`.csv`, `.xlsx`, `.xls`), non-empty payloads, and maximum file size (`MAX_UPLOAD_SIZE_MB`).
+  - `DatasetLoader` implements multi-encoding fallback (`utf-8`, `utf-8-sig`, `latin-1`, `cp1252`, `iso-8859-1`) and dynamic delimiter detection (`,`, `;`, `\t`, `|`).
+  - SQL column sanitization ensures safe, unique DuckDB identifiers (`clean_name`) while preserving original header labels in `ColumnSchema` metadata.
+  - In-memory `DuckDBManager` registers pandas DataFrames as isolated tables (`dataset_<uuid>`) and provides fast preview generation.
+- **Frontend FileUpload Component**:
+  - Implemented interactive drag-and-drop zone using Framer Motion.
+  - Client-side size & extension validation with instant feedback.
+  - Displays detected schema badges, null counts, and interactive preview table of first 5 rows.
+- **Synthetic Datasets**:
+  - Created `samples/clean_dataset.csv`, `samples/clean_dataset.xlsx`, and `samples/messy_dataset.csv` (with missing values, duplicates, outliers, mixed types, inconsistent categories).
 
 ## Known Issues / Limitations
-- None in Phase 0 scaffolding.
+- In-memory DuckDB tables are ephemeral and tied to the active server process.
 
 ## Environment Variables Required
 - `APP_ENV`: Application environment (development/production) [Backend]
@@ -42,18 +41,32 @@ Phase 1: File upload and ingestion (Next)
 - `PORT`: Backend port (8000 default) [Backend]
 - `CORS_ORIGINS`: Allowed origins list [Backend]
 - `MAX_UPLOAD_SIZE_MB`: Max upload file size limit (10MB default) [Backend]
+- `MAX_DATASET_ROWS`: Max rows per dataset (500,000 default) [Backend]
+- `MAX_DATASET_COLUMNS`: Max columns per dataset (500 default) [Backend]
 - `GROQ_API_KEY_1`, `GROQ_API_KEY_2`, `GROQ_MODEL`: Groq provider configuration [Backend]
 - `GEMINI_API_KEY_1`, `GEMINI_API_KEY_2`, `GEMINI_MODEL`: Gemini provider configuration [Backend]
 - `VITE_API_BASE_URL`: Base backend URL (http://localhost:8000) [Frontend]
 
 ## Test Status
-- Backend health tests (`backend/tests/test_health.py`): 2 passed in 1.31s.
-- Frontend build (`npm run build`): Clean production bundle compiled in 32s.
+- Backend test suite (`backend/tests/`): 14 passed in 3.71s (`test_health.py` and `test_ingestion.py`).
+- Frontend production bundle (`npm run build`): Clean build in 13.7s.
 
 ## Next Phase Plan
-- **Phase 1: File Upload and Ingestion**
-  - Implement file validation service (MIME/extension check, size limits, CSV/XLSX/XLS structure check, empty dataset rejection).
-  - Implement dataset ingestion service with pandas encoding detection, safe sanitization, DuckDB in-memory database table registration.
-  - Implement `/api/upload` endpoint returning dataset metadata (id, row count, column count, schema preview).
-  - Add comprehensive unit tests for valid CSV, valid Excel, empty files, corrupt files, and oversized files.
-  - Implement initial frontend drag-and-drop file upload component in React with validation feedback.
+- **Phase 2: Dataset Profiling and Quality Checking**
+  - Implement deterministic profiler (`backend/app/services/profiling/profiler.py`):
+    * Row count, column count, data types, null counts and null percentages.
+    * Duplicate row counts and percentages.
+    * Cardinality, unique value counts, top frequent values for categorical columns.
+    * Statistical summaries (min, max, mean, median, std, quantiles) for numerical columns.
+    * Identifier / primary key candidate detection.
+  - Implement deterministic data quality checker (`backend/app/services/quality/checker.py`):
+    * Missing value severity assessment.
+    * Duplicate row detection.
+    * Type mismatch & mixed type heuristics.
+    * Numerical outlier detection using IQR and Z-scores.
+    * Inconsistent categorical labels detection (case variations, extra spaces, abbreviations).
+    * Quality classification: Confirmed issue, Suspicious issue, Informational observation.
+    * Overall data quality score (0 - 100%).
+  - Create Pydantic models for profile and quality report (`backend/app/models/profile.py`, `quality.py`).
+  - Implement API endpoint (`POST /api/profile/{dataset_id}` and `POST /api/quality/{dataset_id}`).
+  - Add comprehensive unit tests on both `clean_dataset.csv` and `messy_dataset.csv`.
