@@ -71,6 +71,17 @@ class DuckDBManager:
         """Executes a SQL query against the DuckDB instance and returns a pandas DataFrame."""
         return self.conn.execute(query).df()
 
+    def drop_table(self, table_name: str):
+        """Drops a table if it exists in DuckDB."""
+        try:
+            self.conn.execute(f"DROP TABLE IF EXISTS {table_name}")
+            for k, v in list(self.registered_tables.items()):
+                if v == table_name:
+                    del self.registered_tables[k]
+            logger.info(f"Dropped DuckDB table '{table_name}'")
+        except Exception as e:
+            logger.warning(f"Error dropping table '{table_name}': {e}")
+
     def table_exists(self, table_name: str) -> bool:
         """Checks if a table exists in DuckDB."""
         try:

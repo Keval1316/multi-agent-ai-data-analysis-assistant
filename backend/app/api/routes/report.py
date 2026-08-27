@@ -8,6 +8,23 @@ from backend.app.services.ingestion.duckdb_manager import duckdb_manager
 router = APIRouter(prefix="/api/dataset", tags=["Reporting & PDF Export"])
 
 
+@router.get("/history")
+async def get_analysis_history():
+    """Retrieves list of past analyzed datasets and reports from session history."""
+    logger.info("Received request for analysis history")
+    return {"history": ReportBuilder.list_history()}
+
+
+@router.delete("/{dataset_id}")
+async def delete_analysis_record(dataset_id: str):
+    """Deletes an analysis report and cleans up resources for a dataset."""
+    logger.info(f"Received request to delete analysis for '{dataset_id}'")
+    deleted = ReportBuilder.delete_report(dataset_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail=f"Dataset '{dataset_id}' not found in active session.")
+    return {"success": True, "message": f"Dataset '{dataset_id}' deleted successfully."}
+
+
 @router.get("/{dataset_id}/report", response_model=AnalysisReport)
 async def get_analysis_report(dataset_id: str):
     """Retrieves the complete compiled analysis report for a dataset."""

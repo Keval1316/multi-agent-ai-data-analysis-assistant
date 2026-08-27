@@ -32,6 +32,40 @@ class ReportBuilder:
         cls._cached_reports[report.dataset_id] = report
 
     @classmethod
+    def list_history(cls):
+        """Returns summarized metadata of all cached analysis reports ordered most recent first."""
+        history = []
+        for r in reversed(list(cls._cached_reports.values())):
+            history.append({
+                "dataset_id": r.dataset_id,
+                "filename": r.filename,
+                "title": r.title,
+                "subtitle": r.subtitle,
+                "generated_at": r.generated_at,
+                "quality_score": r.quality.quality_score if r.quality else 100,
+                "grade": r.quality.grade if r.quality else "A",
+                "total_rows": r.profile.total_rows if r.profile else 0,
+                "total_columns": r.profile.total_columns if r.profile else 0,
+                "domain": r.understanding.domain if r.understanding else "General Data",
+                "charts_count": len(r.charts.charts) if r.charts and r.charts.charts else 0,
+                "insights_count": len(r.insights.insights) if r.insights and r.insights.insights else 0
+            })
+        return history
+
+    @classmethod
+    def delete_report(cls, dataset_id: str) -> bool:
+        """Deletes a cached report and cleans up any related DuckDB table."""
+        if dataset_id in cls._cached_reports:
+            del cls._cached_reports[dataset_id]
+            try:
+                tbl = duckdb_manager.generate_table_name(dataset_id)
+                duckdb_manager.drop_table(tbl)
+            except Exception as e:
+                logger.warning(f"Failed to drop DuckDB table for '{dataset_id}': {e}")
+            return True
+        return False
+
+    @classmethod
     def build_report_from_dataset(
         cls,
         df: pd.DataFrame,

@@ -14,7 +14,8 @@ import {
   ShieldAlert,
   FileText,
   Clock,
-  Cpu
+  Cpu,
+  Square
 } from 'lucide-react';
 
 const PIPELINE_STEPS = [
@@ -37,7 +38,14 @@ const PIPELINE_STEPS = [
   { id: 'render_pdf', index: 17, label: 'Rendering Publication-Grade PDF', agent: 'PDFExporter', icon: FileText },
 ];
 
-export default function PipelineTracker({ currentStep, completedSteps = [], livePreviews = {}, filename = 'dataset.csv' }) {
+export default function PipelineTracker({
+  currentStep,
+  completedSteps = [],
+  livePreviews = {},
+  filename = 'dataset.csv',
+  onStop,
+  isStopping = false
+}) {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
   useEffect(() => {
@@ -61,7 +69,7 @@ export default function PipelineTracker({ currentStep, completedSteps = [], live
       animate={{ opacity: 1, scale: 1 }}
       className="glass-card p-6 md:p-8 rounded-3xl space-y-6 max-w-4xl mx-auto shadow-glass border border-[#CEAB93]/60"
     >
-      {/* 1. Header & Live Clock */}
+      {/* 1. Header & Live Clock & Controls */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-[#CEAB93]/40">
         <div className="space-y-1.5">
           <div className="flex items-center space-x-2">
@@ -81,18 +89,31 @@ export default function PipelineTracker({ currentStep, completedSteps = [], live
           </p>
         </div>
 
-        <div className="flex items-center space-x-3 self-start sm:self-center">
-          <div className="px-4 py-2.5 rounded-2xl bg-white/90 border border-[#CEAB93]/50 shadow-sm text-center">
-            <div className="flex items-center space-x-1.5 text-[10px] uppercase font-mono text-[#7D5A44] font-bold justify-center">
+        <div className="flex flex-wrap items-center gap-2.5 self-start sm:self-center">
+          <div className="px-3.5 py-2 rounded-2xl bg-white/90 border border-[#CEAB93]/50 shadow-sm text-center">
+            <div className="flex items-center space-x-1 text-[10px] uppercase font-mono text-[#7D5A44] font-bold justify-center">
               <Clock className="w-3 h-3" />
               <span>Elapsed</span>
             </div>
-            <span className="text-base font-mono font-extrabold text-[#3E2723]">{formatTimer(elapsedSeconds)}</span>
+            <span className="text-sm font-mono font-extrabold text-[#3E2723]">{formatTimer(elapsedSeconds)}</span>
           </div>
-          <div className="px-4 py-2.5 rounded-2xl bg-gradient-to-br from-[#AD8B73]/15 to-[#E3CAA5]/30 border border-[#AD8B73]/40 shadow-sm text-center">
+
+          <div className="px-3.5 py-2 rounded-2xl bg-gradient-to-br from-[#AD8B73]/15 to-[#E3CAA5]/30 border border-[#AD8B73]/40 shadow-sm text-center">
             <span className="text-[10px] uppercase font-mono text-[#3E2723] block font-bold">Progress</span>
-            <span className="text-base font-mono font-extrabold text-[#3E2723]">{progressPct}%</span>
+            <span className="text-sm font-mono font-extrabold text-[#3E2723]">{progressPct}%</span>
           </div>
+
+          {onStop && (
+            <button
+              onClick={onStop}
+              disabled={isStopping}
+              className="flex items-center space-x-1.5 px-4 py-2 rounded-2xl bg-red-50 hover:bg-red-100 border border-red-200 text-red-700 text-xs font-bold transition-all shadow-sm hover:shadow-md cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed group"
+              title="Terminate Pipeline Execution"
+            >
+              <Square className="w-3.5 h-3.5 fill-red-600 text-red-600 group-hover:scale-110 transition-transform" />
+              <span>{isStopping ? 'Stopping...' : 'Stop Execution'}</span>
+            </button>
+          )}
         </div>
       </div>
 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Sparkles,
@@ -17,7 +17,10 @@ import {
   CheckCircle2,
   FileCode2,
   ArrowRight,
-  ShieldAlert
+  ShieldAlert,
+  History as HistoryIcon,
+  Square,
+  Info
 } from 'lucide-react';
 import PipelineTracker from './components/PipelineTracker';
 import OverviewTab from './components/OverviewTab';
@@ -26,6 +29,7 @@ import StatisticsTab from './components/StatisticsTab';
 import VisualizationsTab from './components/VisualizationsTab';
 import InsightsTab from './components/InsightsTab';
 import ReportMarkdownTab from './components/ReportMarkdownTab';
+import HistorySidebar from './components/HistorySidebar';
 
 export default function App() {
   const [stage, setStage] = useState('upload'); // 'upload' | 'streaming' | 'dashboard'
@@ -35,10 +39,64 @@ export default function App() {
   const [livePreviews, setLivePreviews] = useState({});
   const [finalReport, setFinalReport] = useState(null);
   const [errorMsg, setErrorMsg] = useState(null);
+  const [statusNotice, setStatusNotice] = useState(null);
   const [activeTab, setActiveTab] = useState('overview');
+
+  // Sidebar & History state
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [history, setHistory] = useState(() => {
+    try {
+      const saved = localStorage.getItem('data_analysis_history');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [isStopping, setIsStopping] = useState(false);
+
+  // Cancellation and Stream refs
+  const abortControllerRef = useRef(null);
+  const streamReaderRef = useRef(null);
+
+  // Persist history to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('data_analysis_history', JSON.stringify(history));
+    } catch (err) {
+      console.warn('Failed to save history to localStorage:', err);
+    }
+  }, [history]);
+
+  // Sync initial history from backend if available
+  useEffect(() => {
+    const fetchBackendHistory = async () => {
+      try {
+        const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+        const res = await fetch(`${apiBase}/api/dataset/history`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.history && Array.isArray(data.history) && data.history.length > 0) {
+            setHistory((prev) => {
+              const map = new Map();
+              data.history.forEach((item) => map.set(item.dataset_id, item));
+              prev.forEach((item) => {
+                const existing = map.get(item.dataset_id) || {};
+                map.set(item.dataset_id, { ...existing, ...item });
+              });
+              return Array.from(map.values());
+            });
+          }
+        }
+      } catch {
+        // Backend offline or unreachable, local storage remains intact
+      }
+    };
+    fetchBackendHistory();
+  }, []);
 
   const handleSelectSample = async (sampleName) => {
     setErrorMsg(null);
+    setStatusNotice(null);
     try {
       let sampleData = '';
       let mimeType = 'text/csv';
@@ -82,7 +140,7 @@ ORD-2010,Hank Green,electronics,Mouse,2,25.00,0,50.00,2025-01-10,False,West`;
 
       const file = new File([sampleData], sampleName, { type: mimeType });
       setSelectedFile(file);
-    } catch (err) {
+    } catch {
       setErrorMsg('Failed to load sample dataset');
     }
   };
@@ -91,10 +149,15 @@ ORD-2010,Hank Green,electronics,Mouse,2,25.00,0,50.00,2025-01-10,False,West`;
     if (!selectedFile) return;
 
     setErrorMsg(null);
+    setStatusNotice(null);
     setStage('streaming');
     setCurrentStep('validate_file');
     setCompletedSteps([]);
     setLivePreviews({});
+    setIsStopping(false);
+
+    // Setup AbortController for termination support
+    abortControllerRef.current = new AbortController();
 
     const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
     const formData = new FormData();
@@ -104,6 +167,7 @@ ORD-2010,Hank Green,electronics,Mouse,2,25.00,0,50.00,2025-01-10,False,West`;
       const response = await fetch(`${apiBase}/api/analyze/stream`, {
         method: 'POST',
         body: formData,
+        signal: abortControllerRef.current.signal
       });
 
       if (!response.ok) {
@@ -111,6 +175,7 @@ ORD-2010,Hank Green,electronics,Mouse,2,25.00,0,50.00,2025-01-10,False,West`;
       }
 
       const reader = response.body.getReader();
+      streamReaderRef.current = reader;
       const decoder = new TextDecoder();
       let buffer = '';
 
@@ -143,6 +208,25 @@ ORD-2010,Hank Green,electronics,Mouse,2,25.00,0,50.00,2025-01-10,False,West`;
                 if (data.report) {
                   setFinalReport(data.report);
                   setStage('dashboard');
+                  setActiveTab('overview');
+
+                  // Save to persistent history
+                  const historyRecord = {
+                    dataset_id: data.report.dataset_id,
+                    filename: data.report.filename || selectedFile?.name || 'dataset.csv',
+                    title: data.report.title,
+                    subtitle: data.report.subtitle,
+                    generated_at: data.report.generated_at || new Date().toISOString(),
+                    quality_score: data.report.quality?.quality_score || 100,
+                    grade: data.report.quality?.grade || 'A',
+                    total_rows: data.report.profile?.total_rows || 0,
+                    total_columns: data.report.profile?.total_columns || 0,
+                    domain: data.report.understanding?.domain || 'General Data',
+                    charts_count: data.report.charts?.charts?.length || 0,
+                    insights_count: data.report.insights?.insights?.length || 0,
+                    report: data.report
+                  };
+                  setHistory((prev) => [historyRecord, ...prev.filter((h) => h.dataset_id !== data.report.dataset_id)]);
                 }
               } else if (eventType === 'error') {
                 setErrorMsg(data.error || 'Pipeline encountered an error.');
@@ -154,9 +238,88 @@ ORD-2010,Hank Green,electronics,Mouse,2,25.00,0,50.00,2025-01-10,False,West`;
         }
       }
     } catch (err) {
-      console.error('Streaming connection error:', err);
-      setErrorMsg(err.message || 'Connection to analysis engine failed.');
+      if (err.name === 'AbortError') {
+        console.log('Analysis fetch aborted cleanly by user.');
+      } else {
+        console.error('Streaming connection error:', err);
+        setErrorMsg(err.message || 'Connection to analysis engine failed.');
+      }
+    } finally {
+      abortControllerRef.current = null;
+      streamReaderRef.current = null;
+      setIsStopping(false);
     }
+  };
+
+  const handleStopAnalysis = async () => {
+    setIsStopping(true);
+    try {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      if (streamReaderRef.current) {
+        await streamReaderRef.current.cancel();
+      }
+    } catch (err) {
+      console.warn('Error during stream cancellation:', err);
+    } finally {
+      setIsStopping(false);
+      setStage('upload');
+      setCurrentStep(null);
+      setCompletedSteps([]);
+      setLivePreviews({});
+      setStatusNotice('Pipeline analysis was terminated and cancelled by user.');
+    }
+  };
+
+  const handleSelectHistoryReport = async (item) => {
+    setErrorMsg(null);
+    setStatusNotice(null);
+
+    if (item.report) {
+      setFinalReport(item.report);
+      setStage('dashboard');
+      setActiveTab('overview');
+      return;
+    }
+
+    try {
+      const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+      const res = await fetch(`${apiBase}/api/dataset/${item.dataset_id}/report`);
+      if (!res.ok) {
+        throw new Error(`Failed to retrieve dataset report (${res.status})`);
+      }
+      const reportData = await res.json();
+      setHistory((prev) =>
+        prev.map((h) => (h.dataset_id === item.dataset_id ? { ...h, report: reportData } : h))
+      );
+      setFinalReport(reportData);
+      setStage('dashboard');
+      setActiveTab('overview');
+    } catch (err) {
+      setErrorMsg(`Could not load report for ${item.filename}: ${err.message}`);
+    }
+  };
+
+  const handleDeleteHistoryItem = async (dataset_id, e) => {
+    if (e) e.stopPropagation();
+    setHistory((prev) => prev.filter((h) => h.dataset_id !== dataset_id));
+    if (finalReport?.dataset_id === dataset_id) {
+      handleReset();
+    }
+    try {
+      const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+      await fetch(`${apiBase}/api/dataset/${dataset_id}`, { method: 'DELETE' });
+    } catch {
+      // Backend deletion best effort
+    }
+  };
+
+  const handleClearHistory = () => {
+    setHistory([]);
+    try {
+      localStorage.removeItem('data_analysis_history');
+    } catch {}
   };
 
   const handleReset = () => {
@@ -167,6 +330,7 @@ ORD-2010,Hank Green,electronics,Mouse,2,25.00,0,50.00,2025-01-10,False,West`;
     setLivePreviews({});
     setFinalReport(null);
     setErrorMsg(null);
+    setStatusNotice(null);
     setActiveTab('overview');
   };
 
@@ -177,41 +341,69 @@ ORD-2010,Hank Green,electronics,Mouse,2,25.00,0,50.00,2025-01-10,False,West`;
       <div className="fixed bottom-10 right-1/4 w-[550px] h-[550px] bg-[#AD8B73]/20 rounded-full blur-[140px] pointer-events-none -z-10" />
       <div className="fixed inset-0 bg-dot-grid pointer-events-none -z-10 opacity-60" />
 
+      {/* History Sidebar Drawer */}
+      <HistorySidebar
+        isOpen={isSidebarOpen}
+        onClose={() => setIsSidebarOpen(false)}
+        history={history}
+        activeDatasetId={finalReport?.dataset_id}
+        onSelectReport={handleSelectHistoryReport}
+        onDeleteHistoryItem={handleDeleteHistoryItem}
+        onClearHistory={handleClearHistory}
+        onNewAnalysis={handleReset}
+      />
+
       {/* 1. Header Navigation */}
-      <header className="sticky top-0 z-50 bg-white/85 backdrop-blur-xl border-b border-[#CEAB93]/40 shadow-sm transition-all">
+      <header className="sticky top-0 z-40 bg-white/85 backdrop-blur-xl border-b border-[#CEAB93]/40 shadow-sm transition-all">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
           <div className="flex items-center space-x-3.5">
-            <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-[#AD8B73] to-[#3E2723] text-white flex items-center justify-center shadow-md shadow-[#AD8B73]/20 ring-2 ring-white/80">
-              <Bot className="w-6 h-6" />
-            </div>
-            <div>
-              <div className="flex items-center space-x-2">
-                <span className="font-extrabold text-lg tracking-tight text-[#3E2723] font-display">
-                  Multi-Agent Data Analyst
+            <button
+              onClick={() => setIsSidebarOpen(true)}
+              className="p-2.5 rounded-2xl bg-white/90 border border-[#CEAB93]/50 text-[#3E2723] hover:border-[#AD8B73] hover:bg-[#FFFBE9] transition-all shadow-xs flex items-center space-x-2 cursor-pointer group"
+              title="Open Analysis History"
+            >
+              <HistoryIcon className="w-4 h-4 text-[#AD8B73] group-hover:scale-110 transition-transform" />
+              <span className="hidden md:inline text-xs font-bold font-sans">History</span>
+              {history.length > 0 && (
+                <span className="px-1.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-[#AD8B73]/15 text-[#3E2723] border border-[#CEAB93]/40">
+                  {history.length}
                 </span>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-[#AD8B73]/15 text-[#3E2723] border border-[#CEAB93]/50">
-                  v1.0
+              )}
+            </button>
+
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 md:w-11 md:h-11 rounded-2xl bg-gradient-to-br from-[#AD8B73] to-[#3E2723] text-white flex items-center justify-center shadow-md shadow-[#AD8B73]/20 ring-2 ring-white/80">
+                <Bot className="w-5 h-5 md:w-6 md:h-6" />
+              </div>
+              <div>
+                <div className="flex items-center space-x-2">
+                  <span className="font-extrabold text-base md:text-lg tracking-tight text-[#3E2723] font-display">
+                    Multi-Agent Data Analyst
+                  </span>
+                  <span className="hidden sm:inline px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-[#AD8B73]/15 text-[#3E2723] border border-[#CEAB93]/50">
+                    v1.0
+                  </span>
+                </div>
+                <span className="text-[11px] md:text-xs text-[#7D5A44] font-medium tracking-wide block">
+                  Autonomous CSV & Excel Insight Synthesizer
                 </span>
               </div>
-              <span className="text-xs text-[#7D5A44] font-medium tracking-wide">
-                Autonomous CSV & Excel Insight Synthesizer
-              </span>
             </div>
           </div>
 
-          <div className="flex items-center space-x-3">
+          <div className="flex items-center space-x-2.5">
             {stage === 'dashboard' && (
               <button
                 onClick={handleReset}
-                className="flex items-center space-x-2 px-4 py-2 rounded-2xl bg-white/90 border border-[#CEAB93]/60 text-xs font-bold text-[#3E2723] hover:bg-[#FFFBE9] hover:border-[#AD8B73] transition-all shadow-sm cursor-pointer"
+                className="flex items-center space-x-2 px-3.5 py-2 rounded-2xl bg-white/90 border border-[#CEAB93]/60 text-xs font-bold text-[#3E2723] hover:bg-[#FFFBE9] hover:border-[#AD8B73] transition-all shadow-sm cursor-pointer"
               >
                 <RotateCcw className="w-3.5 h-3.5 text-[#AD8B73]" />
-                <span>New Analysis</span>
+                <span className="hidden sm:inline">New Analysis</span>
               </button>
             )}
             <div className="hidden sm:flex items-center space-x-1.5 px-3 py-1.5 rounded-full bg-[#AD8B73]/10 border border-[#CEAB93]/50 text-[#3E2723] text-xs font-mono font-semibold">
               <span className="w-2 h-2 rounded-full bg-[#AD8B73] animate-pulse" />
-              <span>17 Specialized Agents</span>
+              <span>17 Agents</span>
             </div>
           </div>
         </div>
@@ -230,6 +422,26 @@ ORD-2010,Hank Green,electronics,Mouse,2,25.00,0,50.00,2025-01-10,False,West`;
               transition={{ duration: 0.3 }}
               className="space-y-10 max-w-3xl mx-auto"
             >
+              {/* Notice Banner if analysis was stopped / cancelled */}
+              {statusNotice && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="p-4 rounded-2xl bg-[#E3CAA5]/30 border border-[#CEAB93]/60 text-[#3E2723] text-xs flex items-center justify-between shadow-sm"
+                >
+                  <div className="flex items-center space-x-2.5">
+                    <Info className="w-4 h-4 text-[#AD8B73] flex-shrink-0" />
+                    <span className="font-semibold">{statusNotice}</span>
+                  </div>
+                  <button
+                    onClick={() => setStatusNotice(null)}
+                    className="text-[#7D5A44] hover:text-[#3E2723] text-xs font-bold"
+                  >
+                    Dismiss
+                  </button>
+                </motion.div>
+              )}
+
               {/* Hero Banner */}
               <div className="text-center space-y-4">
                 <div className="inline-flex items-center space-x-2 px-3.5 py-1.5 rounded-full bg-white/90 border border-[#CEAB93]/60 shadow-sm text-xs font-bold text-[#3E2723]">
@@ -365,6 +577,8 @@ ORD-2010,Hank Green,electronics,Mouse,2,25.00,0,50.00,2025-01-10,False,West`;
                 completedSteps={completedSteps}
                 livePreviews={livePreviews}
                 filename={selectedFile?.name || 'dataset.csv'}
+                onStop={handleStopAnalysis}
+                isStopping={isStopping}
               />
 
               {errorMsg && (

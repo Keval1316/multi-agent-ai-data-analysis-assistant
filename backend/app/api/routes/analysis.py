@@ -78,6 +78,9 @@ async def event_generator_from_graph(initial_state: dict) -> AsyncGenerator[str,
         })
         logger.info(f"SSE analysis pipeline stream finished successfully for '{dataset_id}'")
 
+    except asyncio.CancelledError:
+        logger.info(f"Pipeline streaming cancelled by client for '{dataset_id}'")
+        return
     except Exception as e:
         logger.exception(f"Pipeline streaming error for '{dataset_id}': {str(e)}")
         yield format_sse_event("error", {
