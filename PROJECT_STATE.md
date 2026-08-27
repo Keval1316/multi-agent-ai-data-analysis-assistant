@@ -1,15 +1,15 @@
 # PROJECT STATE
 
-Last updated: 2026-08-27 11:41
+Last updated: 2026-08-27 11:45
 
 ## Current Phase
-Phase 3: LLM router and dataset understanding (Next)
+Phase 4: Statistical and SQL analysis (Next)
 
 ## Completed Phases
 - [x] Phase 0: Repository scaffolding
 - [x] Phase 1: File upload and ingestion
 - [x] Phase 2: Dataset profiling and quality checking
-- [ ] Phase 3: LLM router and dataset understanding
+- [x] Phase 3: LLM router and dataset understanding
 - [ ] Phase 4: Statistical and SQL analysis
 - [ ] Phase 5: Pattern detection and visualizations
 - [ ] Phase 6: Insight generation and critic loop
@@ -20,15 +20,16 @@ Phase 3: LLM router and dataset understanding (Next)
 - [ ] Phase 11: Deployment and documentation
 
 ## Key Decisions and Notes
-- **Deterministic Profiling & Quality Engine**:
-  - `DatasetProfiler` computes distributions, semantic types (`numeric`, `categorical`, `datetime`, `boolean`, `identifier`), moments (mean, std, skewness), quantiles (Q1, median, Q3, IQR), and frequency distributions deterministically without LLM calls.
-  - `QualityChecker` audits completeness, uniqueness, and consistency, classifying findings into `confirmed_issue` (deduplication needed, empty columns, negative domain values), `suspicious_issue` (extreme outliers >3.0*IQR, inconsistent categorical casing/abbreviations), and `informational` (mild IQR tail values, high cardinality identifiers).
-  - Overall quality score calculated on a 0-100 scale with Grade assigned (A: >=90, B: 80-89, C: 70-79, D: 60-69, F: <60).
-- **Frontend Quality Inspection**:
-  - `DatasetProfileView` displays score gauge, severity counters, issue remedies, column schemas, and interactive frequency distributions.
+- **Resilient Multi-Provider LLM Abstraction**:
+  - Abstract base `LLMProvider` implemented by `GroqProvider` (`groq`), `GeminiProvider` (`google-genai`), and `MockLLMProvider`.
+  - Central `LLMRouter` maintains credential pools (`GROQ_API_KEY_1..3`, `GEMINI_API_KEY_1..2`), tracks health/cooldowns (60s on 429/quota error), automatically fails over across providers, and enforces Pydantic structured output validation.
+  - `DataPrivacyFilter` automatically detects and redacts emails, phone numbers, SSNs, credit card numbers, and secret tokens before prompts leave the system.
+- **Dataset Understanding & Analysis Planning**:
+  - `DatasetUnderstandingAgent` takes compact structural summaries and quality scores to infer business domain, target entity, candidate KPIs, and strategic questions.
+  - `AnalysisPlanningAgent` builds executable analysis plans with strict post-validation against real existing dataset columns, dropping or replacing any hallucinated column names.
 
 ## Known Issues / Limitations
-- None in Phase 2.
+- None in Phase 3.
 
 ## Environment Variables Required
 - `APP_ENV`: Application environment (development/production) [Backend]
@@ -43,19 +44,22 @@ Phase 3: LLM router and dataset understanding (Next)
 - `VITE_API_BASE_URL`: Base backend URL (http://localhost:8000) [Frontend]
 
 ## Test Status
-- Backend test suite (`backend/tests/`): 19 passed in 4.41s (`test_health.py`, `test_ingestion.py`, `test_profiling.py`, `test_quality.py`).
-- Frontend production bundle (`npm run build`): Clean build in 11.45s.
+- Backend test suite (`backend/tests/`): 26 passed in 5.85s (`test_health.py`, `test_ingestion.py`, `test_profiling.py`, `test_quality.py`, `test_llm_router.py`, `test_agents.py`).
+- Frontend production bundle (`npm run build`): Clean build in 9.07s.
 
 ## Next Phase Plan
-- **Phase 3: LLM Router and Dataset Understanding**
-  - Implement resilient LLM provider abstraction (`backend/app/llm/`):
-    * Provider interface, Groq provider (`groq`), Gemini provider (`google-genai`), Mock provider for isolated testing.
-    * Multi-credential configuration and round-robin/least-loaded selection.
-    * Health tracking, rate-limit cooldown, retries, and automatic failover.
-    * Structured output validation against Pydantic models with one correction retry.
-  - Implement Dataset Understanding Agent (`backend/app/agents/understand_dataset.py`):
-    * Ingests compact profile and quality metadata (never full raw dataset).
-    * Infers dataset domain, business context, key candidate KPIs, potential relationships, and primary analytical questions.
-  - Implement Analysis Planning Agent (`backend/app/agents/plan_analysis.py`):
-    * Formulates structured analysis plan referencing strictly validated columns.
-  - Comprehensive unit and mock tests for provider failover, rate limits, invalid JSON recovery, and agent outputs.
+- **Phase 4: Statistical and SQL Analysis**
+  - Implement deterministic statistical analysis engine (`backend/app/services/statistics/engine.py`):
+    * Group-by aggregations (sum, mean, median, min, max, count)
+    * Growth rates, distributions, and quantiles
+    * Correlation matrix computation (Pearson / Spearman)
+    * Hypothesis tests / ANOVA or Chi-Square where statistically appropriate
+  - Implement SQL Generation Agent (`backend/app/agents/generate_sql.py`):
+    * Generates safe DuckDB SQL queries based on validated Analysis Plan
+  - Implement SQL Safety Validator (`backend/app/services/sql/validator.py`):
+    * Validates read-only AST / syntax (permits SELECT, WITH/CTE)
+    * Strictly rejects mutating or dangerous keywords: `INSERT`, `UPDATE`, `DELETE`, `DROP`, `ALTER`, `CREATE`, `COPY`, `ATTACH`, `DETACH`, `INSTALL`, `LOAD`, `PRAGMA`, `IMPORT`, `EXPORT`
+    * Verifies referenced table and column names
+  - Implement SQL Execution Service (`backend/app/services/sql/executor.py`):
+    * Executes queries safely against DuckDB in-memory tables and formats structured result tables
+  - Add comprehensive unit tests for safe SQL execution and rejecting dangerous SQL injections.
