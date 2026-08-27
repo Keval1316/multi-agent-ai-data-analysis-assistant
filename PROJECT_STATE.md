@@ -1,9 +1,9 @@
 # PROJECT STATE
 
-Last updated: 2026-08-27 12:07
+Last updated: 2026-08-27 12:13
 
 ## Current Phase
-Phase 8: Full LangGraph orchestration and SSE (Next)
+Phase 9: Complete frontend workflow (Next)
 
 ## Completed Phases
 - [x] Phase 0: Repository scaffolding
@@ -14,20 +14,25 @@ Phase 8: Full LangGraph orchestration and SSE (Next)
 - [x] Phase 5: Pattern detection and visualizations
 - [x] Phase 6: Insight generation and critic loop
 - [x] Phase 7: Report generation and PDF export
-- [ ] Phase 8: Full LangGraph orchestration and SSE
+- [x] Phase 8: Full LangGraph orchestration and SSE
 - [ ] Phase 9: Complete frontend workflow
 - [ ] Phase 10: End-to-end testing
 - [ ] Phase 11: Deployment and documentation
 
 ## Key Decisions and Notes
-- **Report Generation & ReportLab PDF Exporter**:
-  - `ReportGenerationAgent` structures the full analytical findings into an executive report with detailed markdown sections.
-  - `PDFExporter` uses `reportlab.platypus` with `NumberedCanvas` to compile publication-ready PDFs conforming strictly to brand design tokens (`#40513B`, `#609966`, `#9DC08B`, `#EDF1D6`, `#FFFFFF`).
-  - Endpoints `GET /api/dataset/{dataset_id}/report` and `GET /api/dataset/{dataset_id}/report/pdf` provide instant report retrieval and streaming attachment downloads.
-  - `ReportView.jsx` provides interactive markdown rendering with integrated Plotly charts, insight cards, and one-click PDF download.
+- **17-Node LangGraph StateGraph Architecture**:
+  - Fully compiled 17-node graph in `backend/app/orchestration/graph.py` coordinating:
+    * Node 1: `validate_file` -> Node 2: `load_dataset` -> Node 3: `profile_and_audit`
+    * Node 4: `understand_dataset` -> Node 5: `plan_analysis` -> Node 6: `run_statistical_analysis`
+    * Node 7: `generate_sql` -> Node 8: `validate_sql` -> Node 9: `execute_sql`
+    * Node 10: `detect_patterns` -> Node 11: `select_visualizations` -> Node 12: `render_charts`
+    * Node 13: `generate_insights` -> Node 14: `critic_review` -> Node 15: `revise_insights` (Conditional edge)
+    * Node 16: `generate_report` -> Node 17: `render_pdf` -> `END`
+- **Server-Sent Events (SSE) Streaming Engine**:
+  - `POST /api/analyze/stream` asynchronously streams real-time `step_complete` progress events with live step previews, status labels, agent names, and the final compiled report payload.
 
 ## Known Issues / Limitations
-- None in Phase 7.
+- None in Phase 8.
 
 ## Environment Variables Required
 - `APP_ENV`: Application environment (development/production) [Backend]
@@ -42,30 +47,20 @@ Phase 8: Full LangGraph orchestration and SSE (Next)
 - `VITE_API_BASE_URL`: Base backend URL (http://localhost:8000) [Frontend]
 
 ## Test Status
-- Backend test suite (`backend/tests/`): 47 passed in 3.42s (`test_health.py`, `test_ingestion.py`, `test_profiling.py`, `test_quality.py`, `test_llm_router.py`, `test_agents.py`, `test_statistics.py`, `test_sql_safety.py`, `test_sql_execution.py`, `test_patterns.py`, `test_visualizations.py`, `test_insights.py`, `test_critic.py`, `test_revision_loop.py`, `test_report.py`, `test_pdf_export.py`).
-- Frontend production bundle (`npm run build`): Clean build in 3.04s.
+- Backend test suite (`backend/tests/`): 49 passed in 6.63s (`test_health.py`, `test_ingestion.py`, `test_profiling.py`, `test_quality.py`, `test_llm_router.py`, `test_agents.py`, `test_statistics.py`, `test_sql_safety.py`, `test_sql_execution.py`, `test_patterns.py`, `test_visualizations.py`, `test_insights.py`, `test_critic.py`, `test_revision_loop.py`, `test_report.py`, `test_pdf_export.py`, `test_graph.py`, `test_sse_stream.py`).
+- Frontend production bundle (`npm run build`): Clean build in 2.54s.
 
 ## Next Phase Plan
-- **Phase 8: Full LangGraph Orchestration and SSE**
-  - Implement Typed `AnalysisWorkflowState` (`backend/app/orchestration/state.py`) capturing all 17 multi-agent nodes.
-  - Implement full 17-node LangGraph StateGraph (`backend/app/orchestration/graph.py`):
-    * Node 1: `validate_file`
-    * Node 2: `load_dataset`
-    * Node 3: `profile_and_audit`
-    * Node 4: `understand_dataset`
-    * Node 5: `plan_analysis`
-    * Node 6: `run_statistical_analysis`
-    * Node 7: `generate_sql`
-    * Node 8: `validate_sql`
-    * Node 9: `execute_sql`
-    * Node 10: `detect_patterns`
-    * Node 11: `select_visualizations`
-    * Node 12: `render_charts`
-    * Node 13: `generate_insights`
-    * Node 14: `critic_review`
-    * Node 15: `revise_insights` (conditional routing edge based on `critic_approved` with max 2 loop guard)
-    * Node 16: `generate_report`
-    * Node 17: `render_pdf`
-  - Implement Server-Sent Events (SSE) Streaming Endpoint (`POST /api/analyze/stream` and `GET /api/dataset/{dataset_id}/stream`):
-    * Streams granular agent progress events with step name, status, elapsed time, and payload snapshots.
-  - Add comprehensive unit and integration tests for full graph execution and SSE streaming.
+- **Phase 9: Complete Frontend Workflow**
+  - Implement full interactive multi-agent pipeline workflow in `frontend/src/App.jsx`:
+    * Step 1: Upload View with drag-and-drop file upload, file format validation, and sample dataset selectors (`clean_dataset.csv`, `clean_dataset.xlsx`, `messy_dataset.csv`).
+    * Step 2: Live Pipeline Execution Tracker with animated 17-step progress rail, real-time node badges, elapsed timers, and live preview cards.
+    * Step 3: Interactive Multi-Tab Report Dashboard:
+      - Tab 1: Executive Overview & Synthesis
+      - Tab 2: Data Quality & Profiling Deep-Dive
+      - Tab 3: Statistical Moments & SQL Queries
+      - Tab 4: Interactive Plotly Visualizations
+      - Tab 5: Verified Strategic Insights & Recommendations
+      - Tab 6: Full Markdown Document & PDF Download
+  - Ensure rich design aesthetics conforming to exact custom palette tokens (`#EDF1D6`, `#40513B`, `#609966`, `#9DC08B`, `#FFFFFF`).
+  - Test browser interactions and build frontend bundle.
