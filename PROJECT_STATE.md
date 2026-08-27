@@ -1,9 +1,9 @@
 # PROJECT STATE
 
-Last updated: 2026-08-27 12:13
+Last updated: 2026-08-27 12:20
 
 ## Current Phase
-Phase 9: Complete frontend workflow (Next)
+Phase 11: Deployment and documentation (Next)
 
 ## Completed Phases
 - [x] Phase 0: Repository scaffolding
@@ -15,24 +15,21 @@ Phase 9: Complete frontend workflow (Next)
 - [x] Phase 6: Insight generation and critic loop
 - [x] Phase 7: Report generation and PDF export
 - [x] Phase 8: Full LangGraph orchestration and SSE
-- [ ] Phase 9: Complete frontend workflow
-- [ ] Phase 10: End-to-end testing
+- [x] Phase 9: Complete frontend workflow
+- [x] Phase 10: End-to-end testing
 - [ ] Phase 11: Deployment and documentation
 
 ## Key Decisions and Notes
-- **17-Node LangGraph StateGraph Architecture**:
-  - Fully compiled 17-node graph in `backend/app/orchestration/graph.py` coordinating:
-    * Node 1: `validate_file` -> Node 2: `load_dataset` -> Node 3: `profile_and_audit`
-    * Node 4: `understand_dataset` -> Node 5: `plan_analysis` -> Node 6: `run_statistical_analysis`
-    * Node 7: `generate_sql` -> Node 8: `validate_sql` -> Node 9: `execute_sql`
-    * Node 10: `detect_patterns` -> Node 11: `select_visualizations` -> Node 12: `render_charts`
-    * Node 13: `generate_insights` -> Node 14: `critic_review` -> Node 15: `revise_insights` (Conditional edge)
-    * Node 16: `generate_report` -> Node 17: `render_pdf` -> `END`
-- **Server-Sent Events (SSE) Streaming Engine**:
-  - `POST /api/analyze/stream` asynchronously streams real-time `step_complete` progress events with live step previews, status labels, agent names, and the final compiled report payload.
+- **End-to-End Pipeline & Boundary Verification**:
+  - Full automated E2E suite (`backend/tests/test_e2e_pipeline.py`) verifies:
+    * Clean CSV pipeline: full 17 nodes, moments, SQL execution, Plotly visuals, verified insights, and valid PDF bytes.
+    * Clean Excel pipeline: openpyxl ingestion and report compilation.
+    * Messy CSV pipeline: quality degradation, anomaly isolation, and robust report generation.
+    * HTTP & SSE workflow: `POST /api/upload` $\rightarrow$ `GET /api/dataset/{id}/profile` $\rightarrow$ `GET /api/dataset/{id}/quality` $\rightarrow$ `POST /api/analyze/stream` $\rightarrow$ `GET /api/dataset/{id}/report` $\rightarrow$ `GET /api/dataset/{id}/report/pdf`.
+    * Security & boundary resilience: rejects unsupported file formats, empty files, and injection payloads.
 
 ## Known Issues / Limitations
-- None in Phase 8.
+- None in Phase 10.
 
 ## Environment Variables Required
 - `APP_ENV`: Application environment (development/production) [Backend]
@@ -47,20 +44,15 @@ Phase 9: Complete frontend workflow (Next)
 - `VITE_API_BASE_URL`: Base backend URL (http://localhost:8000) [Frontend]
 
 ## Test Status
-- Backend test suite (`backend/tests/`): 49 passed in 6.63s (`test_health.py`, `test_ingestion.py`, `test_profiling.py`, `test_quality.py`, `test_llm_router.py`, `test_agents.py`, `test_statistics.py`, `test_sql_safety.py`, `test_sql_execution.py`, `test_patterns.py`, `test_visualizations.py`, `test_insights.py`, `test_critic.py`, `test_revision_loop.py`, `test_report.py`, `test_pdf_export.py`, `test_graph.py`, `test_sse_stream.py`).
-- Frontend production bundle (`npm run build`): Clean build in 2.54s.
+- Backend test suite (`backend/tests/`): 54 passed in 5.88s (`test_health.py`, `test_ingestion.py`, `test_profiling.py`, `test_quality.py`, `test_llm_router.py`, `test_agents.py`, `test_statistics.py`, `test_sql_safety.py`, `test_sql_execution.py`, `test_patterns.py`, `test_visualizations.py`, `test_insights.py`, `test_critic.py`, `test_revision_loop.py`, `test_report.py`, `test_pdf_export.py`, `test_graph.py`, `test_sse_stream.py`, `test_e2e_pipeline.py`).
+- Frontend production bundle (`npm run build`): Clean build in 23.60s.
 
 ## Next Phase Plan
-- **Phase 9: Complete Frontend Workflow**
-  - Implement full interactive multi-agent pipeline workflow in `frontend/src/App.jsx`:
-    * Step 1: Upload View with drag-and-drop file upload, file format validation, and sample dataset selectors (`clean_dataset.csv`, `clean_dataset.xlsx`, `messy_dataset.csv`).
-    * Step 2: Live Pipeline Execution Tracker with animated 17-step progress rail, real-time node badges, elapsed timers, and live preview cards.
-    * Step 3: Interactive Multi-Tab Report Dashboard:
-      - Tab 1: Executive Overview & Synthesis
-      - Tab 2: Data Quality & Profiling Deep-Dive
-      - Tab 3: Statistical Moments & SQL Queries
-      - Tab 4: Interactive Plotly Visualizations
-      - Tab 5: Verified Strategic Insights & Recommendations
-      - Tab 6: Full Markdown Document & PDF Download
-  - Ensure rich design aesthetics conforming to exact custom palette tokens (`#EDF1D6`, `#40513B`, `#609966`, `#9DC08B`, `#FFFFFF`).
-  - Test browser interactions and build frontend bundle.
+- **Phase 11: Deployment and Documentation**
+  - Create comprehensive production documentation in `README.md`:
+    * Architecture overview with ASCII / Mermaid diagram of all 17 agent nodes
+    * Multi-provider LLM router setup and fallback mechanics
+    * Quickstart guide for backend (FastAPI, Uvicorn, Python 3.12) and frontend (React, Vite, Tailwind CSS)
+    * API reference with curl examples for all endpoints
+    * Docker / production deployment guidelines
+  - Final project polish and verification.

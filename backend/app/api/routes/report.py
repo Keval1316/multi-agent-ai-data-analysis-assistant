@@ -19,7 +19,7 @@ async def get_analysis_report(dataset_id: str):
         return cached
 
     # 2. Check if registered in DuckDB to build on-demand
-    tbl = f"dataset_{dataset_id}"
+    tbl = duckdb_manager.generate_table_name(dataset_id)
     if not duckdb_manager.table_exists(tbl):
         raise HTTPException(status_code=404, detail=f"Dataset '{dataset_id}' not found in active session.")
 
@@ -40,7 +40,7 @@ async def download_pdf_report(dataset_id: str):
     # 1. Fetch or build report
     report = ReportBuilder.get_report(dataset_id)
     if not report:
-        tbl = f"dataset_{dataset_id}"
+        tbl = duckdb_manager.generate_table_name(dataset_id)
         if not duckdb_manager.table_exists(tbl):
             raise HTTPException(status_code=404, detail=f"Dataset '{dataset_id}' not found.")
         df = duckdb_manager.get_dataframe(tbl)
