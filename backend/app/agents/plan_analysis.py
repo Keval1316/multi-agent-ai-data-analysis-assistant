@@ -1,5 +1,5 @@
 import json
-from typing import List, Set
+from typing import Set
 from backend.app.models.profile import DatasetProfile
 from backend.app.models.understanding import DatasetUnderstanding
 from backend.app.models.plan import AnalysisPlan, GroupByAnalysisPlan, SQLQueryGoal

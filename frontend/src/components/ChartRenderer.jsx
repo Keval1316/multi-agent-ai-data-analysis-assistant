@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import Plotly from 'plotly.js-dist-min';
 import { motion } from 'framer-motion';
-import { BarChart3, Info } from 'lucide-react';
+import { BarChart3, LineChart, PieChart, ScatterChart, Info, Layers } from 'lucide-react';
 
 export default function ChartRenderer({ spec }) {
   const chartContainerRef = useRef(null);
@@ -42,37 +42,77 @@ export default function ChartRenderer({ spec }) {
 
   if (!spec) return null;
 
+  const getChartIcon = (type) => {
+    switch (type) {
+      case 'line':
+        return <LineChart className="w-4 h-4" />;
+      case 'donut':
+      case 'pie':
+        return <PieChart className="w-4 h-4" />;
+      case 'scatter':
+        return <ScatterChart className="w-4 h-4" />;
+      default:
+        return <BarChart3 className="w-4 h-4" />;
+    }
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      className="p-5 rounded-3xl bg-surface border border-border shadow-sm flex flex-col justify-between"
+      className="flex flex-col space-y-4 w-full"
     >
-      <div>
-        <div className="flex items-center justify-between mb-1">
-          <div className="flex items-center space-x-2">
-            <div className="w-7 h-7 rounded-lg bg-surface-accent/20 border border-border flex items-center justify-center text-primary">
-              <BarChart3 className="w-4 h-4" />
-            </div>
-            <h4 className="font-bold text-text-primary text-sm tracking-tight">{spec.title}</h4>
+      {/* Top Title & Metadata Row */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#CEAB93]/30 pb-4">
+        <div className="flex items-start sm:items-center space-x-3">
+          <div className="w-8 h-8 rounded-xl bg-[#AD8B73]/15 border border-[#CEAB93]/60 flex items-center justify-center text-[#AD8B73] shrink-0 mt-0.5 sm:mt-0">
+            {getChartIcon(spec.chart_type)}
           </div>
-          <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded-md bg-surface-accent/30 text-text-primary border border-border font-semibold">
-            {spec.chart_type}
-          </span>
+          <div>
+            <h4 className="font-extrabold text-[#3E2723] text-base md:text-lg tracking-tight font-display">
+              {spec.title}
+            </h4>
+            {spec.subtitle && (
+              <p className="text-xs text-[#7D5A44] leading-relaxed mt-0.5">{spec.subtitle}</p>
+            )}
+          </div>
         </div>
 
-        {spec.subtitle && (
-          <p className="text-xs text-text-secondary ml-9 mb-3 leading-tight">{spec.subtitle}</p>
-        )}
-
-        {/* Plotly Canvas Container */}
-        <div ref={chartContainerRef} className="w-full h-72 min-h-[280px]" />
+        {/* Metadata Badges */}
+        <div className="flex items-center space-x-2 self-start sm:self-auto shrink-0">
+          {spec.x_column && (
+            <span className="text-[10px] font-mono px-2.5 py-1 rounded-full bg-[#AD8B73]/10 text-[#3E2723] border border-[#CEAB93]/40 font-medium">
+              X: {spec.x_column}
+            </span>
+          )}
+          {spec.aggregation && (
+            <span className="text-[10px] font-mono uppercase px-2.5 py-1 rounded-full bg-[#E3CAA5]/30 text-[#3E2723] border border-[#CEAB93]/50 font-bold">
+              {spec.aggregation}
+            </span>
+          )}
+          <span className="text-[10px] font-mono uppercase px-2.5 py-1 rounded-full bg-[#AD8B73]/20 text-[#3E2723] border border-[#CEAB93]/60 font-bold">
+            {spec.chart_type?.replace('_', ' ')}
+          </span>
+        </div>
       </div>
 
+      {/* Plotly Canvas Container - Full Width */}
+      <div ref={chartContainerRef} className="w-full h-80 sm:h-96 min-h-[340px]" />
+
+      {/* Data-Driven Insight Takeaway Box */}
       {spec.insights_summary && (
-        <div className="mt-3 pt-3 border-t border-border flex items-start space-x-2 text-xs text-text-secondary bg-surface-accent/10 p-2.5 rounded-2xl">
-          <Info className="w-3.5 h-3.5 text-primary mt-0.5 flex-shrink-0" />
-          <span className="text-[11px] leading-relaxed"><b className="text-text-primary font-semibold">Takeaway: </b>{spec.insights_summary}</span>
+        <div className="mt-2 p-4 rounded-2xl bg-[#FFFBE9] border border-[#CEAB93]/60 flex items-start space-x-3 text-xs text-[#3E2723] shadow-xs">
+          <div className="w-5 h-5 rounded-lg bg-[#AD8B73] text-white flex items-center justify-center shrink-0 mt-0.5">
+            <Info className="w-3.5 h-3.5" />
+          </div>
+          <div className="space-y-0.5">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-[#AD8B73] block font-mono">
+              Key Insight / Takeaway
+            </span>
+            <p className="text-xs leading-relaxed text-[#3E2723] font-medium">
+              {spec.insights_summary}
+            </p>
+          </div>
         </div>
       )}
     </motion.div>

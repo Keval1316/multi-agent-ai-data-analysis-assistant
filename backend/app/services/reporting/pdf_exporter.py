@@ -1,6 +1,4 @@
 import io
-from datetime import datetime, timezone
-from typing import Optional
 from reportlab.lib.pagesizes import letter
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -48,7 +46,7 @@ class NumberedCanvas(canvas.Canvas):
         self.line(40, 35, 572, 35)
 
         # Footer text
-        self.drawString(40, 24, "Multi-Agent Data Analyst — Confidential Executive Report")
+        self.drawString(40, 24, "DataPilot:Multi-Agent Data Analyst — Confidential Executive Report")
         page_str = f"Page {self._pageNumber} of {page_count}"
         self.drawRightString(572, 24, page_str)
         self.restoreState()
@@ -199,8 +197,8 @@ class PDFExporter:
         story.append(Spacer(1, 14))
 
         # 2. Executive Summary Box
-        story.append(Paragraph("Executive Summary", h1_style))
-        exec_table = Table([[Paragraph(report.executive_summary, callout_style)]], colWidths=[532])
+        story.append(Paragraph("1. Executive Summary", h1_style))
+        exec_table = Table([[Paragraph(report.executive_summary.replace('\n', '<br/>'), callout_style)]], colWidths=[532])
         exec_table.setStyle(TableStyle([
             ("BACKGROUND", (0, 0), (-1, -1), cls.C_CARD_BG),
             ("LINELEFT", (0, 0), (0, -1), 4, cls.C_PRIMARY),
@@ -210,20 +208,45 @@ class PDFExporter:
         story.append(exec_table)
         story.append(Spacer(1, 14))
 
-        # 3. Verified Insights & Strategic Recommendations
-        story.append(Paragraph("Verified Evidence-Grounded Insights & Questions Resolved", h1_style))
+        # 3. Data Quality Breakdown Table
+        if report.data_quality_breakdown:
+            story.append(Paragraph("Data Quality & Hygiene Audit Breakdown", h1_style))
+            q_headers = ["Check", "Result", "Status"]
+            q_rows = [[Paragraph(h, table_header_style) for h in q_headers]]
+            for item in report.data_quality_breakdown:
+                q_rows.append([
+                    Paragraph(item.get("check", ""), table_cell_style),
+                    Paragraph(item.get("result", ""), table_cell_style),
+                    Paragraph(item.get("status", ""), table_cell_style),
+                ])
+            q_table = Table(q_rows, colWidths=[220, 160, 152])
+            q_table.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (-1, 0), cls.C_DARK),
+                ("BOX", (0, 0), (-1, -1), 0.5, cls.C_ACCENT),
+                ("INNERGRID", (0, 0), (-1, -1), 0.5, cls.C_LIGHT),
+                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [cls.C_WHITE, cls.C_CARD_BG]),
+                ("PADDING", (0, 0), (-1, -1), 5),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ]))
+            story.append(q_table)
+            story.append(Spacer(1, 14))
+
+        # 4. Verified Insights & Findings Cards
+        story.append(Paragraph("Verified Strategic Insights & Evidence", h1_style))
         for ins in report.insights.insights:
             q_text = ins.question_answered or f"What key empirical pattern is revealed regarding {ins.category} in {ins.title}?"
+            means_p = f"<br/><b>What This Means:</b> {ins.what_this_means}" if ins.what_this_means else ""
             card_content = [
-                Paragraph(f"<b>{ins.title}</b> <font color='#AD8B73'>({ins.category} • {ins.importance} Priority)</font>", h2_style),
+                Paragraph(f"<b>{ins.title}</b> <font color='#AD8B73'>({ins.category} • {ins.importance} Priority • {ins.confidence} Confidence)</font>", h2_style),
                 Paragraph(f"<b>Investigated Question:</b> <i>{q_text}</i>", meta_style),
                 Spacer(1, 2),
-                Paragraph(f"<b>Finding & Empirical Answer:</b> {ins.finding}", body_style),
-                Paragraph(f"<b>Supporting Evidence:</b> {ins.supporting_evidence}", meta_style),
+                Paragraph(f"<b>Finding:</b> {ins.finding}{means_p}", body_style),
+                Paragraph(f"<b>Evidence:</b> {ins.evidence or ins.supporting_evidence}", meta_style),
             ]
-            if ins.recommendation:
+            rec_text = ins.implication or ins.recommendation
+            if rec_text:
                 card_content.append(Spacer(1, 3))
-                card_content.append(Paragraph(f"<b>Strategic Recommendation:</b> {ins.recommendation}", body_style))
+                card_content.append(Paragraph(f"<b>Recommended Action:</b> {rec_text}", body_style))
 
             ins_table = Table([[card_content]], colWidths=[532])
             ins_table.setStyle(TableStyle([
@@ -236,9 +259,9 @@ class PDFExporter:
 
         story.append(Spacer(1, 8))
 
-        # 4. Statistical Moments & Quantiles Summary
+        # 5. Statistical Moments & Quantiles Summary Table
         if report.statistics.univariate_metrics:
-            story.append(Paragraph("Key Statistical Metrics & Quantile Distributions", h1_style))
+            story.append(Paragraph("Parametric Moments & Quantile Distributions", h1_style))
             stat_headers = ["Metric", "Mean", "Median", "Min", "Max", "Std Dev", "IQR", "Skewness"]
             stat_rows = [[Paragraph(h, table_header_style) for h in stat_headers]]
 
@@ -268,35 +291,17 @@ class PDFExporter:
             story.append(stat_table)
             story.append(Spacer(1, 14))
 
-        # 5. Detected Patterns & Anomaly Log
-        if report.patterns.trends or report.patterns.anomalies:
-            story.append(Paragraph("Detected Trends, Concentrations & Anomalies", h1_style))
-            pattern_bullets = []
-            for t in report.patterns.trends[:3]:
-                pattern_bullets.append(f"• <b>Trend ({t.metric_column}):</b> {t.description}")
-            for c in report.patterns.concentrations[:2]:
-                pattern_bullets.append(f"• <b>Concentration:</b> {c.description}")
-            for a in report.patterns.anomalies[:3]:
-                pattern_bullets.append(f"• <b>Anomaly ({a.row_identifier}):</b> {a.description}")
-
-            pattern_table = Table([[Paragraph("<br/><br/>".join(pattern_bullets), body_style)]], colWidths=[532])
-            pattern_table.setStyle(TableStyle([
-                ("BACKGROUND", (0, 0), (-1, -1), cls.C_CARD_BG),
-                ("BOX", (0, 0), (-1, -1), 0.5, cls.C_ACCENT),
-                ("PADDING", (0, 0), (-1, -1), 8),
-            ]))
-            story.append(pattern_table)
-            story.append(Spacer(1, 14))
-
-        # 6. Data Governance & Limitations Note
-        story.append(Paragraph("Methodology, Quality & Governance Notes", h1_style))
-        quality_note = (
-            f"Dataset audit assigned Quality Grade {report.quality.grade} ({report.quality.quality_score}/100). "
-            f"Total issues evaluated: {len(report.quality.issues)}. "
-            f"Analyses performed using deterministic execution in DuckDB and SciPy. "
-            f"All insights were verified through adversarial critic auditing."
-        )
-        story.append(Paragraph(quality_note, meta_style))
+        # 6. Detailed Structured Sections (if available)
+        if report.sections:
+            for sec in report.sections:
+                if sec.id in ["sec_1_exec_summary", "sec_exec_summary"]:
+                    continue  # already rendered in callout box above
+                story.append(Paragraph(sec.title, h1_style))
+                story.append(Paragraph(f"<i>{sec.summary}</i>", meta_style))
+                story.append(Spacer(1, 3))
+                formatted_md = sec.markdown_content.replace("\n\n", "<br/><br/>").replace("\n", "<br/>")
+                story.append(Paragraph(formatted_md, body_style))
+                story.append(Spacer(1, 10))
 
         # Build document
         doc.build(story, canvasmaker=NumberedCanvas)

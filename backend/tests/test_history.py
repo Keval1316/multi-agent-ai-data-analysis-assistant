@@ -20,7 +20,7 @@ def clean_dataset_registered():
 
 
 def test_history_endpoint_empty():
-    ReportBuilder._cached_reports.clear()
+    ReportBuilder.clear_all_caches()
     response = client.get("/api/dataset/history")
     assert response.status_code == 200
     data = response.json()
@@ -30,7 +30,7 @@ def test_history_endpoint_empty():
 
 def test_history_and_delete_endpoint(clean_dataset_registered):
     df, dataset_id, table_name = clean_dataset_registered
-    ReportBuilder._cached_reports.clear()
+    ReportBuilder.clear_all_caches()
     
     # 1. Build and cache report
     report = ReportBuilder.build_report_from_dataset(df, dataset_id, table_name, "clean_dataset.csv")

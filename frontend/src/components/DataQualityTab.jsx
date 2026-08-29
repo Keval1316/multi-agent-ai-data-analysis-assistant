@@ -4,7 +4,6 @@ import {
   ShieldAlert,
   AlertTriangle,
   Info,
-  CheckCircle,
   Columns,
   Sparkles,
   Award,

@@ -27,8 +27,3 @@ class LLMProviderError(AppBaseException):
 class SQLSecurityError(AppBaseException):
     """Raised when generated or input SQL violates safety constraints."""
     pass
-
-
-class JobNotFoundError(AppBaseException):
-    """Raised when a requested analysis job is not found."""
-    pass

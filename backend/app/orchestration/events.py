@@ -1,7 +1,7 @@
 import json
 import math
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 
 def clean_nan_and_inf(obj: Any) -> Any:

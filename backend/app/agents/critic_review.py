@@ -1,10 +1,9 @@
 import json
-from typing import List
 from backend.app.models.insights import InsightCollection
 from backend.app.models.statistics import StatisticalAnalysisResult
 from backend.app.models.sql import SQLAnalysisResult
 from backend.app.models.patterns import PatternDetectionResult
-from backend.app.models.critic import CriticReviewResult, UnsupportedClaim
+from backend.app.models.critic import CriticReviewResult
 from backend.app.llm.router import llm_router
 from backend.app.core.logging import logger
 
@@ -25,17 +24,19 @@ class CriticReviewAgent:
         # 1. Format Ground Truth Evidence
         stats_lines = []
         for um in statistics.univariate_metrics:
-            stats_lines.append(f"Stat '{um.column_name}': mean={um.mean}, median={um.median}, min={um.min}, max={um.max}, iqr={um.iqr}")
+            skew_str = f"skew={um.skewness} ({um.distribution_symmetry})" if um.skewness is not None else "skew=N/A"
+            stats_lines.append(f"Stat '{um.column_name}': mean={um.mean}, median={um.median}, min={um.min}, max={um.max}, iqr={um.iqr}, {skew_str}")
         for cp in statistics.correlation_results:
-            stats_lines.append(f"Corr '{cp.col1}' & '{cp.col2}': r={cp.pearson_coef}, p={cp.pearson_pvalue}, sig={cp.is_statistically_significant}")
+            stats_lines.append(f"Corr '{cp.col1}' & '{cp.col2}': r={cp.pearson_coef:+.3f}, p={cp.pearson_pvalue}, sig={cp.is_statistically_significant}, practical_effect='{cp.practical_significance}'")
         for gr in statistics.groupby_results:
-            summary = ", ".join([f"{it.group_value}: {it.sum}" for it in gr.items[:3]])
+            summary = ", ".join([f"{it.group_value}: {it.sum or it.mean} ({it.share_percentage:.1f}%)" for it in gr.items[:3]])
             stats_lines.append(f"GroupBy '{gr.group_column}' ({gr.aggregation} {gr.metric_column}): {summary}")
 
         sql_lines = []
         for sq in sql_results.results:
             if sq.execution_status == "success" and sq.rows:
-                sql_lines.append(f"SQL '{sq.query_name}': {json.dumps(sq.rows[:2])}")
+                warn = f" [WARNING: {sq.query_validation_warning}]" if sq.query_validation_warning else ""
+                sql_lines.append(f"SQL '{sq.query_name}'{warn}: {json.dumps(sq.rows[:2])}")
 
         pattern_lines = [t.description for t in patterns.trends] + [c.description for c in patterns.concentrations] + [a.description for a in patterns.anomalies]
 
@@ -46,19 +47,30 @@ class CriticReviewAgent:
                 f"[Insight ID: {ins.id}]\n"
                 f"Title: {ins.title}\n"
                 f"Finding: {ins.finding}\n"
-                f"Supporting Evidence: {ins.supporting_evidence}\n"
-                f"Recommendation: {ins.recommendation}\n"
+                f"Supporting Evidence: {ins.evidence or ins.supporting_evidence}\n"
+                f"What This Means: {ins.what_this_means}\n"
+                f"Interpretation: {ins.interpretation}\n"
+                f"Recommendation: {ins.implication or ins.recommendation}\n"
+                f"Confidence: {ins.confidence} ({ins.confidence_rationale})\n"
             )
 
         system_prompt = (
-            "You are a rigorous, adversarial AI Critic and Senior Quantitative Auditor. "
-            "Your job is to audit data insights against the ground-truth computed evidence. "
-            "STRICT CRITIC RULES:\n"
-            "1. Check every number, percentage, and metric mentioned in the insights against the ground truth.\n"
-            "2. Flag any hallucinated numbers, fabricated figures, or unverified claims.\n"
-            "3. Reject causal claims that are not statistically justified.\n"
-            "4. If all claims are truthful and supported, set approved=true.\n"
-            "5. If ANY claim is hallucinated or contradicts evidence, set approved=false, list the unsupported_claims, and specify required_corrections."
+            "You are a rigorous, adversarial AI Critic and Senior Quantitative Auditor.\n"
+            "Your job is to audit data insights against the ground-truth computed evidence before final report generation.\n\n"
+            "MANDATORY 10-POINT EVIDENCE VALIDATION CHECKLIST:\n"
+            "1. Is the claim directly supported by the ground truth dataset values and metrics?\n"
+            "2. Is the statistic correctly interpreted (e.g. mean vs median, skewness direction)?\n"
+            "3. Is the conclusion stronger than what the evidence warrants?\n"
+            "4. Is correlation being confused with causation (e.g. claiming X drives or causes Y)?\n"
+            "5. Is statistical significance confused with practical significance (e.g. treating r = 0.15 as a strong pricing signal)?\n"
+            "6. Are variable names and concepts interpreted correctly (e.g. stock quantity != profitability/performance, stock != supplier reliability)?\n"
+            "7. Is the recommendation directly supported by the observed finding (no wild leaps)?\n"
+            "8. Is the sample size and evidence sufficient for the stated confidence rating?\n"
+            "9. Are claims claiming 'Pareto' strictly backed by >= 75-80% concentration?\n"
+            "10. Is the language clear, simple, and free of unnecessary pretentious jargon?\n\n"
+            "DECISION RULES:\n"
+            "- If all insights pass the 10 checks, set approved=true, unsupported_claims=[], and severity_of_discrepancy='None'.\n"
+            "- If ANY insight fails one or more checks (e.g. asserts causality, calls high stock 'high performing', confuses statistical with practical significance, fabricates numbers), set approved=false, list the unsupported_claims with exact reasons, and provide required_corrections."
         )
 
         user_prompt = (
@@ -68,7 +80,7 @@ class CriticReviewAgent:
             f"Detected Patterns:\n{chr(10).join(pattern_lines[:6])}\n\n"
             f"--- INSIGHTS UNDER REVIEW ---\n\n"
             f"{chr(10).join(insights_lines)}\n\n"
-            f"Conduct an audit and return a CriticReviewResult."
+            f"Execute the 10-point Evidence Validation Audit and return a CriticReviewResult."
         )
 
         messages = [

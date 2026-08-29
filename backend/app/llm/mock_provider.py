@@ -250,60 +250,72 @@ class MockLLMProvider(LLMProvider):
                 dataset_id = id_match.group(1)
 
             # Extract numbers/metrics from prompt if present
-            stat_matches = re.findall(r"- Metric '([^']+)': Mean=([\d,\.]+), Median=([\d,\.]+)", prompt_text)
+            stat_matches = re.findall(r"- Metric '([^']+)': Count=(\d+), Mean=([\d,\.]+), Median=([\d,\.]+)", prompt_text)
             corr_matches = re.findall(r"- Correlation '([^']+)' vs '([^']+)': Pearson r=([+-]?[\d\.]+)", prompt_text)
             group_matches = re.findall(r"- GroupBy '([^']+)' by '([^']+)'.*?: ([^,\n]+)", prompt_text)
 
-            m1_name, m1_mean, m1_med = stat_matches[0] if stat_matches else (primary_num, "1,250.00", "980.00")
-            c1_name, c2_name, c_val = corr_matches[0] if corr_matches else (primary_num, secondary_num, "+0.72")
-            g_dim, g_met, g_top = group_matches[0] if group_matches else (primary_cat, primary_num, "Top Segment (45.2%)")
+            m1_name = stat_matches[0][0] if stat_matches else (primary_num or "stock_quantity")
+            m1_mean = stat_matches[0][2] if stat_matches else "125.00"
+            m1_med = stat_matches[0][3] if stat_matches else "104.00"
+            c1_name = corr_matches[0][0] if corr_matches else (primary_num or "stock_quantity")
+            c2_name = corr_matches[0][1] if corr_matches else (secondary_num or "unit_price")
+            c_val = corr_matches[0][2] if corr_matches else "+0.152"
+            g_dim = group_matches[0][0] if group_matches else (primary_cat or "category")
+            g_met = group_matches[0][1] if group_matches else (primary_num or "stock_quantity")
+            g_top = group_matches[0][2] if group_matches else "Top Categories (43.5%)"
 
             insights = [
                 InsightItem(
                     id="ins_1",
-                    title=f"Segment Performance & {g_dim.replace('_', ' ').title()} Concentration",
-                    finding=f"Operational metrics demonstrate pronounced concentration across {g_dim}, with leading segments dominating overall volume.",
-                    evidence=f"Top segment distribution in {g_dim}: {g_top}. Group aggregation confirms statistically significant variance across segments.",
-                    interpretation=f"The dataset reveals that high-performing {g_dim} segments drive the vast majority of {g_met}, creating concentrated exposure.",
-                    implication=f"Focus strategic resource allocation and operational monitoring on top-performing {g_dim} groups while developing targeted growth initiatives for secondary segments.",
-                    question_answered=f"How is {g_met.replace('_', ' ')} distributed across {g_dim.replace('_', ' ')}, and do top segments concentrate the majority share?",
-                    empirical_answer=f"Yes, {g_dim.replace('_', ' ')} demonstrates high Pareto concentration, where leading segments account for {g_top}.",
-                    category="Growth Driver",
-                    importance="High",
-                    confidence="High"
+                    title=f"Inventory Concentration in {g_dim.replace('_', ' ').title()}",
+                    finding=f"Inventory volume is concentrated in a relatively small number of {g_dim} categories.",
+                    evidence=f"The top {g_dim} categories account for {g_top} of total {g_met}.",
+                    what_this_means=f"A large share of inventory sits in a few categories. Note: High stock indicates inventory volume, not product profitability or sales success.",
+                    interpretation=f"Concentration in these categories means inventory holding risk and warehouse capacity are heavily exposed to them.",
+                    implication=f"Review stock turnover and customer demand rates for top {g_dim} categories to ensure inventory matches actual sales velocity.",
+                    confidence="High",
+                    confidence_rationale="Computed deterministically across all records.",
+                    question_answered=f"How is {g_met.replace('_', ' ')} distributed across {g_dim.replace('_', ' ')}?",
+                    empirical_answer=f"The top categories account for {g_top} of total volume, reflecting inventory concentration.",
+                    category="Inventory & Operations",
+                    importance="High"
                 ),
                 InsightItem(
                     id="ins_2",
-                    title=f"Distribution Skewness in {m1_name.replace('_', ' ').title()}",
-                    finding=f"Statistical analysis of '{m1_name}' indicates an asymmetric distribution where mean values diverge from the median baseline.",
-                    evidence=f"Computed parametric moments for '{m1_name}': Mean = {m1_mean}, Median = {m1_med}. Skewness reflects an extended right-tail distribution.",
-                    interpretation=f"A standard average significantly overstates baseline typical performance; median figures ({m1_med}) provide a more robust operational benchmark.",
-                    implication=f"Adopt median-based KPI targets rather than simple arithmetic means to prevent high-value outliers from distorting performance targets.",
-                    question_answered=f"Does '{m1_name.replace('_', ' ')}' exhibit significant distribution skewness between arithmetic average and median benchmarks?",
-                    empirical_answer=f"Yes, Mean ({m1_mean}) noticeably diverges from Median ({m1_med}), demonstrating positive distribution skewness.",
-                    category="Performance",
-                    importance="Medium",
-                    confidence="High"
+                    title=f"Distribution Profile for {m1_name.replace('_', ' ').title()}",
+                    finding=f"The distribution of '{m1_name}' has an extended upper tail, resulting in a mean that is higher than the median.",
+                    evidence=f"Computed parametric moments: Mean = {m1_mean}, Median = {m1_med}. Skewness indicates a right-skewed distribution.",
+                    what_this_means=f"The median ({m1_med}) represents typical items better than the average ({m1_mean}) because a few high-volume items pull the average up.",
+                    interpretation=f"Using the average alone could create unrealistic inventory targets for typical items.",
+                    implication=f"Consider using the median alongside sales velocity and demand forecasts when establishing inventory guidelines.",
+                    confidence="High",
+                    confidence_rationale="Supported by complete univariate moment calculations.",
+                    question_answered=f"Does '{m1_name.replace('_', ' ')}' exhibit significant distribution skewness?",
+                    empirical_answer=f"Yes, Mean ({m1_mean}) exceeds Median ({m1_med}) due to right-skewed values.",
+                    category="Distribution Profile",
+                    importance="Medium"
                 ),
                 InsightItem(
                     id="ins_3",
-                    title=f"Empirical Association: {c1_name.replace('_', ' ').title()} vs {c2_name.replace('_', ' ').title()}",
-                    finding=f"Detected a strong, statistically significant correlation between '{c1_name}' and '{c2_name}'.",
-                    evidence=f"Pearson correlation coefficient r = {c_val} (statistically significant at p < 0.05). Verified across all cleaned dataset rows.",
-                    interpretation=f"Movement in '{c1_name}' consistently tracks variations in '{c2_name}', indicating an underlying operational linkage.",
-                    implication=f"Leverage '{c1_name}' as a leading indicator to forecast and optimize '{c2_name}' resource planning.",
-                    question_answered=f"Is there an empirical, statistically significant relationship linking '{c1_name.replace('_', ' ')}' with '{c2_name.replace('_', ' ')}'?",
-                    empirical_answer=f"Yes, Pearson r = {c_val} confirms a statistically significant empirical correlation (p < 0.05).",
-                    category="Performance",
-                    importance="High",
-                    confidence="High"
+                    title=f"Relationship Assessment: {c1_name.replace('_', ' ').title()} vs {c2_name.replace('_', ' ').title()}",
+                    finding=f"There is a weak linear relationship between '{c1_name}' and '{c2_name}' (r = {c_val}).",
+                    evidence=f"Pearson correlation r = {c_val}. Although statistically evaluated, the effect size is weak.",
+                    what_this_means=f"Changes in '{c1_name}' do not reliably predict '{c2_name}'. Correlation does not imply that one causes the other.",
+                    interpretation=f"The weak association indicates that these two variables should not be assumed to have an operational or pricing dependency.",
+                    implication=f"Do not adjust '{c2_name}' strategy based on '{c1_name}' levels alone; validate with separate demand and margin data.",
+                    confidence="Moderate",
+                    confidence_rationale="Linear correlation measured across dataset sample; no causal relationship inferred.",
+                    question_answered=f"Is there a meaningful relationship between '{c1_name.replace('_', ' ')}' and '{c2_name.replace('_', ' ')}'?",
+                    empirical_answer=f"The relationship is weak (r = {c_val}) with minimal practical effect size.",
+                    category="Relationships & Trends",
+                    importance="Medium"
                 )
             ]
 
             summary_points = [
-                f"Significant concentration across leading {g_dim} segments driving primary {g_met} volume ({g_top}).",
-                f"Distribution skewness in {m1_name} (Mean={m1_mean} vs Median={m1_med}) necessitates median-based benchmarking.",
-                f"Statistically significant correlation (r = {c_val}) identified between {c1_name} and {c2_name}."
+                f"Inventory is concentrated in top {g_dim} segments ({g_top}).",
+                f"Right-skewed distribution in {m1_name} (Mean={m1_mean} vs Median={m1_med}) makes median a useful operational reference point.",
+                f"Weak correlation between {c1_name} and {c2_name} (r = {c_val}) should not be interpreted as a causal or strong pricing signal."
             ]
 
             return InsightCollection(
@@ -350,28 +362,99 @@ class MockLLMProvider(LLMProvider):
         if response_model == GeneratedReportMarkdown:
             return GeneratedReportMarkdown(
                 title=f"{domain} Executive Intelligence Report",
-                subtitle=f"Quantitative Profiling, Empirical Distributions, SQL Aggregations & Strategic Recommendations for {entity}",
-                executive_summary=(
-                    f"This comprehensive analytical report evaluates the uploaded {domain.lower()} dataset structure, statistical moments, "
-                    f"and categorical dimensions. Our multi-agent pipeline processed the dataset across profiling, quality auditing, "
-                    f"deterministic statistical modeling ({primary_num}), DuckDB SQL execution, pattern detection, and adversarial insight verification."
+                subtitle=f"Evidence-Based Analysis, Distribution Profiling & Operational Recommendations",
+                executive_summary_markdown=(
+                    f"### Overall Summary\n"
+                    f"This report presents an evidence-based analysis of the {domain.lower()} dataset. "
+                    f"All findings follow a strict data-to-evidence reasoning order and avoid unverified assumptions.\n\n"
+                    f"### Key Findings (Top 3-5)\n"
+                    f"1. **Inventory Concentration**: A substantial share of volume is concentrated in leading categories.\n"
+                    f"2. **Distribution Profile**: Metrics exhibit positive skewness where mean exceeds median.\n"
+                    f"3. **Relationship Evaluation**: Measured correlations exhibit weak practical effect sizes and do not establish causation.\n\n"
+                    f"### Main Risks\n"
+                    f"- Inventory imbalance across categories without corresponding demand validation.\n"
+                    f"- Absence of sales velocity and supplier lead-time data to confirm performance.\n\n"
+                    f"### Recommended Next Steps\n"
+                    f"1. Review turnover and demand rates for concentrated categories.\n"
+                    f"2. Utilize median reference points alongside demand forecasts for inventory planning.\n"
+                    f"3. Integrate point-of-sale and supplier fulfillment metrics before making operational changes."
+                ),
+                dataset_overview_markdown=(
+                    f"The dataset contains structured {domain.lower()} records. Key variables include numerical measurements "
+                    f"('{primary_num or 'metric'}') and categorical groupings ('{primary_cat or 'category'}'). "
+                    f"Data hygiene audits verified completeness, record uniqueness, and standardization."
+                ),
+                data_quality_and_validation_markdown=(
+                    f"### Data Hygiene & Validation Audit\n"
+                    f"| Check | Result | Status |\n"
+                    f"| :--- | :--- | :--- |\n"
+                    f"| Duplicate records | 0 | Clean |\n"
+                    f"| Missing values | 0 | None detected |\n"
+                    f"| Invalid / out-of-range values | 0 | None detected |\n"
+                    f"| Category normalization | Completed | Standardized |\n"
+                    f"| Overall quality score | 100/100 | Grade A |\n\n"
+                    f"*Methodology*: The data quality score reflects automated audits for row duplication, null rates, range boundaries, and label standardization."
                 ),
                 key_findings_markdown=(
-                    f"### 1. Empirical Questions Answered & Segment Concentration\n"
-                    f"- Quantitative analysis of '{primary_num}' demonstrates significant variance across '{primary_cat}'.\n"
-                    f"- Leading '{primary_cat}' categories concentrate the primary volume share of '{primary_num}'.\n\n"
-                    f"### 2. Statistical Moments & Distribution Skewness\n"
-                    f"- '{primary_num}' exhibits positive distribution skewness, where arithmetic averages exceed median benchmarks.\n"
-                    f"- Extreme value anomalies and boundary outliers were isolated and verified for audit integrity."
+                    f"### 1. Inventory Concentration Across Categories\n"
+                    f"- **Finding**: Stock quantity is concentrated in a small number of categories.\n"
+                    f"- **Evidence**: Top categories account for over 40% of total stock.\n"
+                    f"- **What This Means**: A few categories hold most warehouse volume. High stock reflects inventory volume, not product success or profitability.\n"
+                    f"- **Confidence**: High (supported by total dataset aggregation).\n\n"
+                    f"### 2. Metric Distribution & Skewness\n"
+                    f"- **Finding**: The distribution is right-skewed with an extended upper tail.\n"
+                    f"- **Evidence**: The arithmetic mean exceeds the median.\n"
+                    f"- **What This Means**: Median values better represent typical items without outlier distortion.\n"
+                    f"- **Confidence**: High (supported by calculated skewness moments)."
                 ),
-                strategic_recommendations_markdown=(
-                    f"1. **Targeted Segment Optimization**: Prioritize high-performing '{primary_cat}' groups for resource allocation and monitoring.\n"
-                    f"2. **Median-Based Benchmarking**: Adopt median metrics for '{primary_num}' to prevent outlier distortion in operational reviews.\n"
-                    f"3. **Data Hygiene Governance**: Maintain data entry validation rules to preserve quality score standards."
+                distribution_analysis_markdown=(
+                    f"Univariate analysis indicates that numerical variables exhibit moderate positive skewness. "
+                    f"The median provides a reliable representation of typical baseline values, while the mean reflects the influence of high-volume observations."
                 ),
-                methodology_and_caveats_markdown=(
-                    "Analysis was conducted using deterministic computation (DuckDB SQL, SciPy moments, Pearson/Spearman correlations) "
-                    "combined with evidence-grounded AI multi-agent synthesis. Group differences reflect empirical historical records."
+                category_analysis_markdown=(
+                    f"Categorical evaluation reveals that inventory is concentrated in a limited number of segments. "
+                    f"Note: These categories are described as inventory-heavy rather than 'high-performing' because sales, margins, and turnover data are not present in this dataset."
+                ),
+                product_analysis_markdown=(
+                    f"Item-level examination highlights specific products with elevated stock levels. "
+                    f"These items represent inventory holding concentration and should be monitored for holding costs and turnover."
+                ),
+                supplier_analysis_markdown=(
+                    f"Supplier analysis reflects the total inventory volume associated with each vendor ('Supplier inventory contribution'). "
+                    f"Note: True supplier performance (such as lead times, defect rates, and fulfillment reliability) cannot be evaluated because those variables are not in the dataset."
+                ),
+                relationship_analysis_markdown=(
+                    f"Bivariate correlation analysis indicates weak linear relationships between numerical variables. "
+                    f"While statistically evaluated, effect sizes are weak and should not be used as independent pricing or forecasting signals. "
+                    f"**Important**: Correlation does not establish causation."
+                ),
+                trend_analysis_markdown=(
+                    f"Temporal analysis indicates no statistically significant time-based trend (R² ≈ 0, p >= 0.05). "
+                    f"Observed percentage differences across periods reflect normal operational variation rather than a confirmed growth trajectory."
+                ),
+                recommendations_markdown=(
+                    f"### Recommendation 1: Review Inventory Concentration\n"
+                    f"- **Finding**: Inventory is concentrated in top categories.\n"
+                    f"- **Evidence**: Leading categories hold a disproportionate share of volume.\n"
+                    f"- **Business Implication**: Potential overstocking risk or working capital tie-up.\n"
+                    f"- **Recommended Action**: Review sales turnover and customer demand before reordering.\n"
+                    f"- **Confidence**: High.\n\n"
+                    f"### Recommendation 2: Adopt Balanced Inventory Reference Points\n"
+                    f"- **Finding**: Skewed distribution makes mean higher than median.\n"
+                    f"- **Evidence**: Mean exceeds median across item quantities.\n"
+                    f"- **Business Implication**: Relying solely on averages distorts inventory targets.\n"
+                    f"- **Recommended Action**: Use the median as a reference point while incorporating demand velocity and safety stock requirements.\n"
+                    f"- **Confidence**: High."
+                ),
+                limitations_markdown=(
+                    f"- **Cross-Sectional Scope**: Data represents a single snapshot without multi-year historical depth.\n"
+                    f"- **Absence of Commercial Metrics**: Sales velocity, profit margins, and revenue figures are not present, preventing profitability assessments.\n"
+                    f"- **Supplier Metrics**: Vendor reliability, defect rates, and delivery lead times are unrecorded."
+                ),
+                suggested_next_analysis_markdown=(
+                    f"1. **Point-of-Sale Integration**: Merge transaction logs to evaluate true inventory turnover and product performance.\n"
+                    f"2. **Supplier Scorecard Integration**: Capture lead times and order defect rates for supplier performance benchmarking.\n"
+                    f"3. **Demand Elasticity Modeling**: Model price sensitivity and seasonal demand fluctuations."
                 )
             )  # type: ignore
 

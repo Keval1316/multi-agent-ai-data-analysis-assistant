@@ -160,6 +160,22 @@ class ReportBuilder:
         return deleted
 
     @classmethod
+    def clear_all_caches(cls):
+        """Wipes both in-memory and disk caches for clean isolation."""
+        import shutil
+        cls._cached_reports.clear()
+        cls._cached_cleaned_dfs.clear()
+        try:
+            if REPORTS_CACHE_DIR.exists():
+                shutil.rmtree(REPORTS_CACHE_DIR, ignore_errors=True)
+                REPORTS_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+            if CLEANED_CACHE_DIR.exists():
+                shutil.rmtree(CLEANED_CACHE_DIR, ignore_errors=True)
+                CLEANED_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        except Exception as e:
+            logger.warning(f"Error resetting report cache directories: {e}")
+
+    @classmethod
     def build_report_from_dataset(
         cls,
         df: pd.DataFrame,

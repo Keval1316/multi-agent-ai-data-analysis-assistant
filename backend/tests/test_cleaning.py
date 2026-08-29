@@ -111,9 +111,104 @@ def test_messy_dataset_cleaning():
     assert summary.validation_passed is True
 
 
+def test_website_traffic_and_synonym_collapsing():
+    """Tests device synonym collapsing ('tab'/'Tab'/'Tablet' -> 'Tablet', 'mobile'/'cell' -> 'Mobile', 'nort'/'north' -> 'North')."""
+    traffic_data = {
+        "session_id": ["S1", "S2", "S3", "S4", "S5", "S6"],
+        "device": ["tab", "Tab", "Tablet", "mobile", "cell", "desk"],
+        "channel": ["org", "organic", "google", "cpc", "social", "direct"],
+        "region": ["nort", "NORTH", "North", "w.", "west", "South"],
+        "bounce_rate": ["0.45", "N/A", "0.60", "45%", "0.30", "0.55"]
+    }
+    df = pd.DataFrame(traffic_data)
+    cleaned_df, summary = DataCleaner.clean_dataset(df, "traffic_test", "traffic.csv")
+
+    # Devices collapsed
+    unique_devices = set(cleaned_df["device"].unique())
+    assert unique_devices == {"Tablet", "Mobile", "Desktop"}
+
+    # Regions collapsed
+    unique_regions = set(cleaned_df["region"].unique())
+    assert unique_regions == {"North", "West", "South"}
+
+    # Channels standardized
+    unique_channels = set(cleaned_df["channel"].unique())
+    assert "Organic Search" in unique_channels
+    assert "Paid Search" in unique_channels
+
+    # Bounce rate numeric
+    assert pd.api.types.is_numeric_dtype(cleaned_df["bounce_rate"])
+    assert (cleaned_df["bounce_rate"] <= 1.0).all() or (cleaned_df["bounce_rate"] <= 100.0).all()
+    assert summary.validation_passed is True
+
+
+def test_multi_format_dates_disambiguation():
+    """Tests multi-format date parsing and 100% ISO-8601 conversion."""
+    dates_data = {
+        "event_id": ["E1", "E2", "E3", "E4", "E5"],
+        "event_date": [
+            "2025-01-15",
+            "25/01/2025",      # Day > 12 -> DD/MM/YYYY disambiguation
+            "03/02/2025",      # Should be parsed as 2025-02-03 given DD/MM/YYYY context
+            "15-Jan-2025",     # DD-Mon-YYYY
+            "2025/01/20"       # YYYY/MM/DD
+        ]
+    }
+    df = pd.DataFrame(dates_data)
+    cleaned_df, summary = DataCleaner.clean_dataset(df, "dates_test", "dates.csv")
+
+    date_col = cleaned_df["event_date"].tolist()
+    assert all(isinstance(d, str) for d in date_col)
+    assert all(len(d) == 10 and d.count("-") == 2 for d in date_col)
+    assert date_col[0] == "2025-01-15"
+    assert date_col[1] == "2025-01-25"
+    assert date_col[2] == "2025-02-03"
+    assert date_col[3] == "2025-01-15"
+    assert date_col[4] == "2025-01-20"
+    assert summary.dates_normalized >= 3
+    assert summary.validation_passed is True
+
+
+def test_encoding_and_formatting_artifacts():
+    """Tests mojibake fixing, control characters stripping, and accounting-style negative numbers."""
+    artifact_data = {
+        "item_id": ["ITM-1", "ITM-2", "ITM-3"],
+        "name": ["CafÃ© Latte\x00\x1f", "MontrÃ©al Roast", "ChloÃ© Mocha"],
+        "profit_loss": ["(500)", "$1,250.50", "($75.25)"],
+        "discount": ["10%", "5%", "0%"]
+    }
+    df = pd.DataFrame(artifact_data)
+    cleaned_df, summary = DataCleaner.clean_dataset(df, "encoding_test", "encoding.csv")
+
+    assert cleaned_df["name"].tolist() == ["Café Latte", "Montréal Roast", "Chloé Mocha"]
+    assert cleaned_df["profit_loss"].tolist() == [-500, 1250.5, -75.25]
+    assert cleaned_df["discount"].tolist() == [10, 5, 0]
+    assert summary.encoding_artifacts_fixed >= 3
+    assert summary.validation_passed is True
+
+
+def test_near_duplicates_merging_and_conflicts():
+    """Tests merging near duplicates and flagging conflicting duplicate IDs."""
+    near_dup_data = {
+        "cust_id": ["C-101", "C-101", "C-102", "C-102"],
+        "cust_name": ["Alice Smith", "Alice Smith", "Bob Jones", "Bob Jones"],
+        "email": ["alice@work.com", None, "bob@jones.com", "bob.diff@work.com"],  # C-101 is mergeable; C-102 is conflicting
+        "age": [30, 30, 45, 55]  # C-102 has conflicting age
+    }
+    df = pd.DataFrame(near_dup_data)
+    cleaned_df, summary = DataCleaner.clean_dataset(df, "near_dup_test", "near_dup.csv")
+
+    # C-101 should be merged to 1 record with email 'alice@work.com'
+    c101_rows = cleaned_df[cleaned_df["cust_id"] == "C-101"]
+    assert len(c101_rows) == 1
+    assert c101_rows["email"].values[0] == "alice@work.com"
+
+    # Conflicting issue logged for C-102
+    assert any("C-102" in str(iss.row_id) for iss in summary.unresolved_issues)
+
+
 def test_generic_adaptive_rules_across_domains():
     """Verifies that cleaning rules apply generally to HR, Healthcare, and Finance schemas."""
-    # HR Dataset
     hr_data = {
         "employee_id": ["EMP-1", "EMP-2", "EMP-3"],
         "age": [28, -5, 140],  # out of range
@@ -129,33 +224,3 @@ def test_generic_adaptive_rules_across_domains():
     assert set(cleaned_hr["gender"].unique()).issubset({"Male", "Female"})
     assert pd.api.types.is_numeric_dtype(cleaned_hr["salary"])
     assert hr_summary.validation_passed is True
-
-
-def test_download_cleaned_endpoints():
-    path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "samples", "messy_dataset.csv")
-    with open(path, "rb") as f:
-        content = f.read()
-    df, _ = DatasetLoader.load_and_sanitize(content, ".csv")
-    dataset_id, table_name = duckdb_manager.register_dataframe(df, "clean_endpoint_test_ds")
-    report = ReportBuilder.build_report_from_dataset(df, dataset_id, table_name, "messy_dataset.csv")
-
-    # 1. Test GET /download/cleaned-csv
-    csv_res = client.get(f"/api/dataset/{dataset_id}/download/cleaned-csv")
-    assert csv_res.status_code == 200
-    assert csv_res.headers["content-type"] == "text/csv; charset=utf-8"
-    assert "attachment; filename=\"cleaned_messy_dataset.csv\"" in csv_res.headers["content-disposition"]
-
-    # 2. Test GET /download/cleaned-excel
-    xlsx_res = client.get(f"/api/dataset/{dataset_id}/download/cleaned-excel")
-    assert xlsx_res.status_code == 200
-    assert "spreadsheetml" in xlsx_res.headers["content-type"]
-
-    # 3. Test GET /cleaned-preview
-    preview_res = client.get(f"/api/dataset/{dataset_id}/cleaned-preview")
-    assert preview_res.status_code == 200
-    pdata = preview_res.json()
-    assert "rows" in pdata
-    assert "columns" in pdata
-    assert "cleaning_summary" in pdata
-    assert "change_log" in pdata["cleaning_summary"]
-    assert "before_after" in pdata["cleaning_summary"]

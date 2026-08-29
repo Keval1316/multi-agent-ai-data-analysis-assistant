@@ -1,5 +1,3 @@
-import json
-from typing import List, Dict
 from backend.app.models.profile import DatasetProfile
 from backend.app.models.quality import QualityReport
 from backend.app.models.understanding import DatasetUnderstanding

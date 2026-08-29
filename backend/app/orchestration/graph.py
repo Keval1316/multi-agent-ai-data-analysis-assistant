@@ -230,8 +230,9 @@ def render_charts_node(state: AnalysisWorkflowState) -> Dict[str, Any]:
     df = state["df"]
     profile = state["profile"]
     plan = state["plan"]
+    user_query = state.get("user_query")
 
-    charts = ChartGenerator.generate_all(df, profile, plan)
+    charts = ChartGenerator.generate_all(df, profile, plan, user_query=user_query)
     return {
         "charts": charts,
         "current_step": "render_charts",

@@ -110,6 +110,45 @@ class SQLExecutor:
             return f'SELECT COUNT(*) AS total_records FROM "{table_name}"'
 
     @classmethod
+    def validate_query_intent_against_result(
+        cls,
+        query: GeneratedSQLQuery,
+        result_columns: List[str],
+        row_count: int,
+        rows: List[Dict[str, Any]],
+        table_name: str
+    ) -> Optional[str]:
+        """
+        Validates whether the executed SQL result genuinely aligns with the stated query goal and intent.
+        Flags mismatches (e.g. query name implies filtered item list, but result is dataset-level aggregate).
+        """
+        q_name_lower = query.name.lower()
+        purpose_lower = query.purpose.lower()
+
+        # Keywords implying specific filtered subsets/anomalies
+        filtering_keywords = [
+            "not_recently", "unrestocked", "out_of_stock", "low_stock", "inactive",
+            "missing_", "unassigned", "anomalous_products", "defective", "delayed"
+        ]
+        implies_filtering = any(k in q_name_lower or k in purpose_lower for k in filtering_keywords)
+
+        # Check if result is a pure dataset summary rather than filtered rows
+        aggregate_col_indicators = ["total_records", "record_count", "distinct_", "avg_", "min_", "max_"]
+        is_summary_only = (
+            len(result_columns) > 0 and
+            all(any(ind in col.lower() for ind in aggregate_col_indicators) for col in result_columns)
+        )
+
+        if implies_filtering and is_summary_only:
+            return (
+                f"The query name/purpose suggests that the query should identify specific records ({query.purpose}). "
+                f"However, the returned result contains aggregate summary statistics for the entire dataset. "
+                f"This result should not be interpreted as a filtered list of records."
+            )
+
+        return None
+
+    @classmethod
     def execute_single_query(
         cls,
         query: GeneratedSQLQuery,
@@ -130,7 +169,8 @@ class SQLExecutor:
                 columns=[],
                 rows=[],
                 execution_duration_ms=0.0,
-                error_message=reason
+                error_message=reason,
+                query_validation_warning=None
             )
 
         # 2. Inspect table schema in DuckDB
@@ -154,6 +194,8 @@ class SQLExecutor:
             rows = clean_df.head(100).to_dict(orient="records")
             logger.info(f"Executed SQL '{query.name}' in {duration_ms}ms ({row_count} rows)")
 
+            val_warning = cls.validate_query_intent_against_result(query, columns, row_count, rows, table_name)
+
             return SQLExecutionResult(
                 query_name=query.name,
                 purpose=query.purpose,
@@ -165,7 +207,8 @@ class SQLExecutor:
                 columns=columns,
                 rows=rows,
                 execution_duration_ms=duration_ms,
-                error_message=None
+                error_message=None,
+                query_validation_warning=val_warning
             )
 
         except Exception as primary_err:
@@ -186,6 +229,8 @@ class SQLExecutor:
                 rows = clean_df.head(100).to_dict(orient="records")
                 logger.info(f"Self-healed SQL '{query.name}' succeeded via schema fallback in {duration_ms}ms ({row_count} rows)")
 
+                val_warning = cls.validate_query_intent_against_result(query, columns, row_count, rows, table_name)
+
                 return SQLExecutionResult(
                     query_name=query.name,
                     purpose=query.purpose,
@@ -197,7 +242,8 @@ class SQLExecutor:
                     columns=columns,
                     rows=rows,
                     execution_duration_ms=duration_ms,
-                    error_message=None
+                    error_message=None,
+                    query_validation_warning=val_warning
                 )
             except Exception as fallback_err:
                 duration_ms = round((time.perf_counter() - start_time) * 1000, 2)
@@ -213,7 +259,8 @@ class SQLExecutor:
                     columns=[],
                     rows=[],
                     execution_duration_ms=duration_ms,
-                    error_message=str(fallback_err)
+                    error_message=str(fallback_err),
+                    query_validation_warning=None
                 )
 
     @classmethod
@@ -226,6 +273,7 @@ class SQLExecutor:
         logger.info(f"Executing {len(queries)} analytical queries on table '{table_name}'")
 
         results: List[SQLExecutionResult] = []
+        warnings: List[str] = []
         success_cnt = 0
         failed_cnt = 0
 
@@ -236,6 +284,8 @@ class SQLExecutor:
                 success_cnt += 1
             else:
                 failed_cnt += 1
+            if res.query_validation_warning:
+                warnings.append(f"Query '{res.query_name}': {res.query_validation_warning}")
 
         return SQLAnalysisResult(
             dataset_id=dataset_id,
@@ -243,5 +293,6 @@ class SQLExecutor:
             total_queries=len(queries),
             successful_queries=success_cnt,
             failed_queries=failed_cnt,
-            results=results
+            results=results,
+            validation_warnings=warnings
         )

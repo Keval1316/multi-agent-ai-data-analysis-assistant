@@ -1,4 +1,4 @@
-from typing import List, Dict, Any, Optional
+from typing import List, Optional
 from pydantic import BaseModel, Field
 
 
@@ -8,9 +8,11 @@ class TrendPattern(BaseModel):
     direction: str = Field(..., description="'increasing', 'decreasing', 'stable', 'volatile'")
     slope: float
     r_squared: float
+    p_value: Optional[float] = None
     growth_rate_pct: float
     description: str
     is_statistically_significant: bool = False
+    plain_english_interpretation: Optional[str] = Field(None, description="Plain-English explanation of regression support vs endpoint noise")
 
 
 class ParetoConcentrationPattern(BaseModel):
@@ -20,8 +22,11 @@ class ParetoConcentrationPattern(BaseModel):
     top_categories_share_pct: float
     total_categories_count: int
     top_category_names: List[str]
-    is_pareto_dominated: bool = Field(..., description="True if top ~20% account for >= 60-80% of total")
+    is_pareto_dominated: bool = Field(..., description="True if top categories hold significant volume")
+    is_true_pareto: bool = Field(False, description="True only if top ~20% account for >= 75-80% of total volume")
+    pattern_label: str = Field("Inventory concentration", description="'Pareto concentration' or 'Inventory concentration'")
     description: str
+    plain_english_interpretation: Optional[str] = Field(None, description="Plain-English summary of concentration without false high-performance claims")
 
 
 class AnomalyPattern(BaseModel):

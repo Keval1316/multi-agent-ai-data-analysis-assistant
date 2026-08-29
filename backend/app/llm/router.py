@@ -23,7 +23,6 @@ class LLMRouter:
     def __init__(self):
         self.cooldown_duration_seconds = 60.0
         self.cooldowns: Dict[str, float] = {}  # provider_key_id -> expiration_timestamp
-        self._round_robin_indices: Dict[str, int] = {"groq": 0, "gemini": 0}
         self.mock_provider = MockLLMProvider()
 
     @classmethod

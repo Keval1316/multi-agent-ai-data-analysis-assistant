@@ -19,13 +19,10 @@ import {
   BarChart3,
   Lightbulb,
   FileText,
-  ShieldAlert,
   ChevronDown,
   ChevronUp,
   Check,
-  Zap,
   Activity,
-  Terminal,
   Download,
   FileSpreadsheet
 } from 'lucide-react';

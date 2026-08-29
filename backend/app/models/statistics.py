@@ -19,6 +19,8 @@ class UnivariateMetric(BaseModel):
     iqr: float
     skewness: Optional[float] = None
     kurtosis: Optional[float] = None
+    distribution_symmetry: Optional[str] = Field(None, description="Plain-English description of distribution symmetry/skewness")
+    plain_english_summary: Optional[str] = Field(None, description="Plain-English explanation of mean vs median and spread")
 
 
 class CorrelationPairResult(BaseModel):
@@ -28,8 +30,11 @@ class CorrelationPairResult(BaseModel):
     pearson_pvalue: Optional[float] = None
     spearman_coef: float
     spearman_pvalue: Optional[float] = None
-    strength: str = Field(..., description="'Strong Positive', 'Moderate Positive', 'Weak', 'Moderate Negative', 'Strong Negative'")
+    direction: str = Field("Positive", description="'Positive', 'Negative', or 'None'")
+    strength: str = Field(..., description="'Negligible', 'Weak', 'Moderate', 'Strong', 'Very Strong'")
+    practical_significance: str = Field(..., description="Assessment of practical effect size (e.g. 'Negligible practical effect', 'Weak practical effect')")
     is_statistically_significant: bool = False
+    plain_english_interpretation: Optional[str] = Field(None, description="Plain-English interpretation evaluating statistical vs practical significance and causality warning")
 
 
 class GroupBySummaryItem(BaseModel):

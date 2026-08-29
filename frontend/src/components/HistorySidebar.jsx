@@ -10,7 +10,6 @@ import {
   Plus,
   Search,
   Database,
-  ArrowRight,
   ShieldCheck,
   ChevronRight
 } from 'lucide-react';

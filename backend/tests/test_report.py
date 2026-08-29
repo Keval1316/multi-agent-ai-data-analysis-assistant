@@ -31,9 +31,27 @@ def test_build_report_from_dataset(clean_dataset_registered):
     assert report.dataset_id == dataset_id
     assert report.title != ""
     assert report.executive_summary != ""
-    assert len(report.sections) >= 3
+    assert len(report.sections) == 13
     assert len(report.insights.insights) >= 1
     assert len(report.charts.charts) >= 1
+    assert report.data_quality_breakdown is not None
+    assert len(report.data_quality_breakdown) >= 5
+
+    # Check 13 section titles
+    section_titles = [s.title for s in report.sections]
+    assert any("Executive Summary" in t for t in section_titles)
+    assert any("Dataset Overview" in t for t in section_titles)
+    assert any("Data Quality" in t for t in section_titles)
+    assert any("Key Findings" in t for t in section_titles)
+    assert any("Distribution Analysis" in t for t in section_titles)
+    assert any("Category Analysis" in t for t in section_titles)
+    assert any("Product" in t for t in section_titles)
+    assert any("Supplier" in t for t in section_titles)
+    assert any("Relationship" in t for t in section_titles)
+    assert any("Trend" in t for t in section_titles)
+    assert any("Recommendations" in t for t in section_titles)
+    assert any("Limitations" in t for t in section_titles)
+    assert any("Suggested Next Analysis" in t for t in section_titles)
 
 
 def test_api_get_report_endpoint(client, clean_dataset_registered):
@@ -45,4 +63,5 @@ def test_api_get_report_endpoint(client, clean_dataset_registered):
     assert data["dataset_id"] == dataset_id
     assert "executive_summary" in data
     assert "sections" in data
-    assert len(data["sections"]) >= 3
+    assert len(data["sections"]) == 13
+    assert "data_quality_breakdown" in data

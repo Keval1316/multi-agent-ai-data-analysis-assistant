@@ -5,14 +5,6 @@ from backend.app.core.config import settings
 from backend.app.core.exceptions import FileValidationError
 
 ALLOWED_EXTENSIONS = {".csv", ".xlsx", ".xls"}
-ALLOWED_MIME_TYPES = {
-    "text/csv",
-    "text/plain",
-    "application/csv",
-    "application/vnd.ms-excel",
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    "application/octet-stream",  # Fallback for some OS/browser uploads
-}
 
 
 class FileValidator:

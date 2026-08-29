@@ -15,9 +15,6 @@ import {
   TrendingUp,
   Lightbulb,
   CheckCircle2,
-  FileCode2,
-  ArrowRight,
-  ShieldAlert,
   History as HistoryIcon,
   Square,
   Info
@@ -374,7 +371,7 @@ ORD-2010,Hank Green,electronics,Mouse,2,25.00,0,50.00,2025-01-10,False,West`;
             <div>
               <div className="flex items-center space-x-2">
                 <span className="font-extrabold text-base md:text-lg tracking-tight text-[#3E2723] font-display">
-                  Multi-Agent Data Analyst
+                  DataPilot:Multi-Agent Data Analyst
                 </span>
                 <span className="hidden sm:inline px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-[#AD8B73]/15 text-[#3E2723] border border-[#CEAB93]/50">
                   v1.0
@@ -414,7 +411,7 @@ ORD-2010,Hank Green,electronics,Mouse,2,25.00,0,50.00,2025-01-10,False,West`;
 
             <div className="hidden sm:flex items-center space-x-1.5 px-3 py-1.5 rounded-full bg-[#AD8B73]/10 border border-[#CEAB93]/50 text-[#3E2723] text-xs font-mono font-semibold">
               <span className="w-2 h-2 rounded-full bg-[#AD8B73] animate-pulse" />
-              <span>17 Agents</span>
+              <span>17 agents active</span>
             </div>
           </div>
         </div>
@@ -558,7 +555,7 @@ ORD-2010,Hank Green,electronics,Mouse,2,25.00,0,50.00,2025-01-10,False,West`;
                       className="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-[#AD8B73] to-[#3E2723] text-white font-extrabold text-sm md:text-base tracking-wide hover:from-[#3E2723] hover:to-[#2C1810] shadow-lg shadow-[#AD8B73]/30 hover:shadow-xl hover:shadow-[#3E2723]/30 hover:scale-[1.01] active:scale-[0.99] transition-all duration-200 flex items-center justify-center space-x-2.5 cursor-pointer"
                     >
                       <Sparkles className="w-5 h-5 animate-pulse" />
-                      <span>Launch 17-Agent Pipeline</span>
+                      <span>Launch Agents Pipeline</span>
                       <ArrowRight className="w-4 h-4 ml-1" />
                     </button>
                   </motion.div>
@@ -699,7 +696,7 @@ ORD-2010,Hank Green,electronics,Mouse,2,25.00,0,50.00,2025-01-10,False,West`;
 
       {/* Footer */}
       <footer className="border-t border-[#CEAB93]/40 bg-white/60 backdrop-blur-md py-6 text-center text-xs text-[#7D5A44] font-mono">
-        Multi-Agent AI Data Analysis Assistant • LangGraph Orchestration & DuckDB Engine
+        DataPilot:Multi-Agent Data Analyst • LangGraph Orchestration & DuckDB Engine
       </footer>
     </div>
   );

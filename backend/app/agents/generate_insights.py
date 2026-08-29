@@ -1,4 +1,3 @@
-import json
 from typing import Optional
 from backend.app.models.understanding import DatasetUnderstanding
 from backend.app.models.statistics import StatisticalAnalysisResult
@@ -29,12 +28,13 @@ class InsightGenerationAgent:
         # 1. Summarize statistical evidence
         stats_evidence = []
         for um in statistics.univariate_metrics:
+            skew_desc = um.distribution_symmetry or f"Skewness={um.skewness}"
             stats_evidence.append(
-                f"- Metric '{um.column_name}': Mean={um.mean:,.2f}, Median={um.median:,.2f}, Min={um.min:,.2f}, Max={um.max:,.2f}, Std={um.std:,.2f}, IQR={um.iqr:,.2f}, Skewness={um.skewness:,.2f}"
+                f"- Metric '{um.column_name}': Count={um.count}, Mean={um.mean:,.2f}, Median={um.median:,.2f}, Min={um.min:,.2f}, Max={um.max:,.2f}, Std={um.std:,.2f}, IQR={um.iqr:,.2f}, Skewness={um.skewness} ({skew_desc})"
             )
         for cp in statistics.correlation_results:
             stats_evidence.append(
-                f"- Correlation '{cp.col1}' vs '{cp.col2}': Pearson r={cp.pearson_coef:+.3f} (p-value={cp.pearson_pvalue:.4f}), Statistically Significant={cp.is_statistically_significant}, Strength={cp.strength}"
+                f"- Correlation '{cp.col1}' vs '{cp.col2}': Pearson r={cp.pearson_coef:+.3f} (p={cp.pearson_pvalue}), Direction={cp.direction}, Strength={cp.strength}, Practical Effect={cp.practical_significance}, Stat Significant={cp.is_statistically_significant}"
             )
         for gr in statistics.groupby_results:
             top_items = [f"{it.group_value}: {it.sum or it.mean:,.2f} ({it.share_percentage:.1f}%)" for it in gr.items[:5]]
@@ -42,52 +42,50 @@ class InsightGenerationAgent:
                 f"- GroupBy '{gr.group_column}' by '{gr.metric_column}' ({gr.aggregation}): {', '.join(top_items)}"
             )
 
-        # 2. Summarize SQL query results
+        # 2. Summarize SQL query results with validation warnings
         sql_evidence = []
         for sq in sql_results.results:
             if sq.execution_status == "success" and sq.rows:
                 top_rows_str = ", ".join([str(r) for r in sq.rows[:3]])
+                warn_str = f" [WARNING: {sq.query_validation_warning}]" if sq.query_validation_warning else ""
                 sql_evidence.append(
-                    f"- Query '{sq.query_name}' ({sq.purpose}): {sq.row_count} rows. Top results: [{top_rows_str}]"
+                    f"- Query '{sq.query_name}' ({sq.purpose}){warn_str}: {sq.row_count} rows. Top results: [{top_rows_str}]"
                 )
 
         # 3. Summarize Pattern results
         pattern_evidence = []
         for t in patterns.trends:
-            pattern_evidence.append(f"- Trend ({t.metric_column}): {t.description}")
+            pattern_evidence.append(f"- Trend ({t.metric_column}): {t.description} [R²={t.r_squared}, p={t.p_value}, Sig={t.is_statistically_significant}]")
         for c in patterns.concentrations:
-            pattern_evidence.append(f"- Concentration ({c.dimension_column}): {c.description} (Share: {c.top_categories_share_pct:.1f}%)")
+            pattern_evidence.append(f"- {c.pattern_label} ({c.dimension_column}): {c.description} (Share: {c.top_categories_share_pct:.1f}%)")
         for a in patterns.anomalies:
             pattern_evidence.append(f"- Anomaly ({a.metric_column}): {a.description} [Severity: {a.severity}]")
         for s in patterns.seasonality:
             pattern_evidence.append(f"- Seasonality ({s.metric_column}): {s.description}")
 
         system_prompt = (
-            "You are a Lead Quantitative AI Data Strategist and Senior Quantitative Auditor. "
-            "Your objective is to generate 3 to 6 high-impact, deeply quantitative insights for any dataset domain "
-            "(Sales, Finance, Healthcare, HR, Operations, Education, Logistics, Customer, etc.).\n\n"
-            "MANDATORY INSIGHT STRUCTURE:\n"
-            "For every insight, you MUST populate:\n"
-            "1. 'question_answered': The explicit, concrete business or analytical question this insight answers based on the real dataset columns and discovered patterns.\n"
-            "2. 'empirical_answer': Concise quantitative direct answer to the question backed by empirical data.\n"
-            "3. 'finding': Direct analytical finding stating exactly what occurred in the data.\n"
-            "4. 'evidence': The EXACT numbers, percentages, baseline figures, p-values, or query rows from the computed data.\n"
-            "5. 'interpretation': The operational or domain meaning of these numbers.\n"
-            "6. 'implication': Concrete, actionable recommendation or strategic next step for decision-makers.\n\n"
-            "STRICT GROUNDING RULES:\n"
-            "- NEVER formulate generic or disconnected questions. Every question MUST directly reference the actual column names, metrics, segments, or correlations.\n"
-            "- NEVER use vague phrases like 'significant growth', 'certain categories', or 'outliers were found' without citing the exact category names, periods, and figures.\n"
-            "- Every figure cited in 'evidence' must match the computed evidence tables.\n"
-            "- DO NOT assert causality unless statistically proven (use 'is correlated with', 'is associated with', 'suggests').\n"
-            "- Return a structured InsightCollection."
+            "You are a Senior Quantitative AI Data Analyst and Statistical Auditor.\n"
+            "Your objective is to generate 3 to 6 evidence-grounded, statistically responsible insights.\n\n"
+            "MANDATORY REASONING CHAIN:\n"
+            "Data → Analysis → Finding → Evidence → Interpretation → Business Impact → Recommendation → Confidence\n\n"
+            "STRICT STATISTICAL & INTERPRETATION RULES:\n"
+            "1. CORRELATION IS NOT CAUSATION: Never claim variable X drives or causes variable Y based on correlation.\n"
+            "2. STATISTICAL VS PRACTICAL SIGNIFICANCE: A statistically significant correlation with small effect size (|r| < 0.30) is NOT a strong predictive or pricing signal. State this clearly.\n"
+            "3. DO NOT CONFUSE HIGH STOCK WITH HIGH PERFORMANCE: Never call high-stock categories 'high-performing', 'profitable', or 'successful' without sales/margin data. Use 'inventory concentration' or 'high-stock category'.\n"
+            "4. SUPPLIER ANALYSIS: Never evaluate supplier performance based on stock quantity alone. Use 'supplier inventory contribution' and state that supplier reliability/fulfillment data is absent.\n"
+            "5. MEAN VS MEDIAN & SKEWNESS: Never claim 'high values pull average upward' if mean < median. Use calculated skewness. Positive skew means right-tailed with higher values; negative skew means left-tailed.\n"
+            "6. CONCENTRATION VS PARETO: Do NOT call every concentration 'Pareto'. Only use Pareto when top ~20% account for ~80% of volume. Otherwise call it 'Inventory concentration'.\n"
+            "7. PRUDENT RECOMMENDATIONS: Avoid aggressive directives ('immediately change pricing', 'replace supplier'). Prefer 'investigate', 'review', 'monitor', 'validate', 'conduct further analysis'.\n"
+            "8. PLAIN ENGLISH: Avoid convoluted jargon. Provide simple explanations in 'what_this_means'.\n"
+            "9. CONFIDENCE RATING: Assign 'High', 'Moderate', or 'Low' based on sample size and variable completeness, and provide 'confidence_rationale'."
         )
 
         critique_block = ""
         if revision_critique:
             critique_block = (
-                f"\n\nCRITICAL REVIEW FEEDBACK FROM PREVIOUS ATTEMPT (YOU MUST FIX THESE):\n"
+                f"\n\nCRITICAL AUDIT FEEDBACK FROM PREVIOUS PASS (YOU MUST RESOLVE THESE):\n"
                 f"{revision_critique}\n"
-                f"Carefully correct the rejected claims to strictly match the ground-truth evidence."
+                f"Carefully correct the rejected claims to strictly align with ground-truth evidence."
             )
 
         user_prompt = (
@@ -104,8 +102,7 @@ class InsightGenerationAgent:
             f"--- DETECTED PATTERNS, TRENDS & ANOMALIES ---\n"
             f"{chr(10).join(pattern_evidence[:8]) if pattern_evidence else 'No extreme multi-sigma outliers detected.'}"
             f"{critique_block}\n\n"
-            f"Generate an InsightCollection with 3 to 6 evidence-grounded insights. "
-            f"For each insight, clearly define 'question_answered', 'empirical_answer', 'finding', 'evidence', 'interpretation', and 'implication' directly grounded in the computed data."
+            f"Generate an InsightCollection with 3 to 6 evidence-grounded insights following the mandatory reasoning chain."
         )
 
         messages = [

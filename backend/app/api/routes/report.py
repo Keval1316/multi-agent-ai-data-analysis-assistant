@@ -16,6 +16,15 @@ async def get_analysis_history():
     return {"history": ReportBuilder.list_history()}
 
 
+@router.delete("/history")
+@router.delete("/history/all")
+async def clear_all_analysis_history():
+    """Deletes all analysis reports, cached dataframes, and cleans up all caches."""
+    logger.info("Received request to clear all analysis history")
+    ReportBuilder.clear_all_caches()
+    return {"success": True, "message": "All analysis history cleared successfully."}
+
+
 @router.delete("/{dataset_id}")
 async def delete_analysis_record(dataset_id: str):
     """Deletes an analysis report and cleans up resources for a dataset."""
@@ -109,10 +118,8 @@ async def download_pdf_report(dataset_id: str):
         raise HTTPException(status_code=500, detail=f"Failed to render PDF: {str(e)}")
 
 
-@router.get("/{dataset_id}/download/cleaned-csv")
-async def download_cleaned_csv(dataset_id: str):
-    """Generates and streams the sanitized, production-ready CSV dataset."""
-    logger.info(f"Received request for cleaned CSV download on dataset '{dataset_id}'")
+def _resolve_cleaned_dataframe(dataset_id: str):
+    """Retrieves or creates and caches the cleaned DataFrame for a dataset."""
     from backend.app.services.cleaning.cleaner import DataCleaner
 
     cleaned_df = ReportBuilder.get_cleaned_df(dataset_id)
@@ -127,7 +134,19 @@ async def download_cleaned_csv(dataset_id: str):
         df = duckdb_manager.get_dataframe(tbl)
         cleaned_df, cleaning_summary = DataCleaner.clean_dataset(df, dataset_id, filename)
         ReportBuilder.cache_cleaned_df(dataset_id, cleaned_df)
+        if report:
+            report.cleaning_summary = cleaning_summary.model_dump()
 
+    return cleaned_df, report, clean_base
+
+
+@router.get("/{dataset_id}/download/cleaned-csv")
+async def download_cleaned_csv(dataset_id: str):
+    """Generates and streams the sanitized, production-ready CSV dataset."""
+    logger.info(f"Received request for cleaned CSV download on dataset '{dataset_id}'")
+    from backend.app.services.cleaning.cleaner import DataCleaner
+
+    cleaned_df, _, clean_base = _resolve_cleaned_dataframe(dataset_id)
     try:
         csv_bytes = DataCleaner.export_csv_bytes(cleaned_df)
         download_filename = f"cleaned_{clean_base}.csv"
@@ -150,19 +169,7 @@ async def download_cleaned_excel(dataset_id: str):
     logger.info(f"Received request for cleaned Excel download on dataset '{dataset_id}'")
     from backend.app.services.cleaning.cleaner import DataCleaner
 
-    cleaned_df = ReportBuilder.get_cleaned_df(dataset_id)
-    report = ReportBuilder.get_report(dataset_id)
-    filename = report.filename if report else f"{dataset_id}.csv"
-    clean_base = filename.rsplit(".", 1)[0] if "." in filename else filename
-
-    if cleaned_df is None:
-        tbl = duckdb_manager.generate_table_name(dataset_id)
-        if not duckdb_manager.table_exists(tbl):
-            raise HTTPException(status_code=404, detail=f"Dataset '{dataset_id}' not found.")
-        df = duckdb_manager.get_dataframe(tbl)
-        cleaned_df, _ = DataCleaner.clean_dataset(df, dataset_id, filename)
-        ReportBuilder.cache_cleaned_df(dataset_id, cleaned_df)
-
+    cleaned_df, _, clean_base = _resolve_cleaned_dataframe(dataset_id)
     try:
         excel_bytes = DataCleaner.export_excel_bytes(cleaned_df, sheet_name="Cleaned Data")
         download_filename = f"cleaned_{clean_base}.xlsx"
@@ -183,21 +190,7 @@ async def download_cleaned_excel(dataset_id: str):
 async def get_cleaned_preview(dataset_id: str):
     """Returns top 20 rows and transformation summary of the cleaned dataset for UI preview."""
     logger.info(f"Received request for cleaned preview on dataset '{dataset_id}'")
-    from backend.app.services.cleaning.cleaner import DataCleaner
-
-    cleaned_df = ReportBuilder.get_cleaned_df(dataset_id)
-    report = ReportBuilder.get_report(dataset_id)
-
-    if cleaned_df is None:
-        tbl = duckdb_manager.generate_table_name(dataset_id)
-        if not duckdb_manager.table_exists(tbl):
-            raise HTTPException(status_code=404, detail=f"Dataset '{dataset_id}' not found.")
-        df = duckdb_manager.get_dataframe(tbl)
-        filename = report.filename if report else "dataset.csv"
-        cleaned_df, cleaning_summary = DataCleaner.clean_dataset(df, dataset_id, filename)
-        ReportBuilder.cache_cleaned_df(dataset_id, cleaned_df)
-        if report:
-            report.cleaning_summary = cleaning_summary.model_dump()
+    cleaned_df, report, _ = _resolve_cleaned_dataframe(dataset_id)
 
     # Replace NaNs/Infs for JSON serialization
     clean_preview = cleaned_df.head(20).where(pd.notnull(cleaned_df.head(20)), None)

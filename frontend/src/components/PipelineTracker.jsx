@@ -14,7 +14,6 @@ import {
   ShieldAlert,
   FileText,
   Clock,
-  Cpu,
   Square
 } from 'lucide-react';
 

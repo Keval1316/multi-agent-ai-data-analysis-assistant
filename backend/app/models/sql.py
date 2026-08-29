@@ -25,6 +25,7 @@ class SQLExecutionResult(BaseModel):
     rows: List[Dict[str, Any]] = Field(default_factory=list)
     execution_duration_ms: float = 0.0
     error_message: Optional[str] = None
+    query_validation_warning: Optional[str] = Field(None, description="Warning if query intent/name mismatches returned aggregate/filtered structure")
 
 
 class SQLAnalysisResult(BaseModel):
@@ -34,3 +35,4 @@ class SQLAnalysisResult(BaseModel):
     successful_queries: int
     failed_queries: int
     results: List[SQLExecutionResult]
+    validation_warnings: List[str] = Field(default_factory=list, description="List of all detected query-result intent mismatches and warnings")

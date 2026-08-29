@@ -6,7 +6,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     APP_ENV: str = "development"
-    APP_NAME: str = "Multi-Agent Data Analyst API"
+    APP_NAME: str = "DataPilot:Multi-Agent Data Analyst API"
     APP_VERSION: str = "1.0.0"
     LOG_LEVEL: str = "INFO"
     HOST: str = "0.0.0.0"

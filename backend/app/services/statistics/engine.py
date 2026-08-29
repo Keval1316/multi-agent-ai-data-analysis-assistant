@@ -1,4 +1,4 @@
-from typing import List, Dict, Any, Optional
+from typing import List
 import numpy as np
 import pandas as pd
 from scipy import stats
@@ -22,13 +22,32 @@ class StatisticalEngine:
         if np.isnan(coef):
             return "Undefined"
         abs_val = abs(coef)
-        sign = "Positive" if coef >= 0 else "Negative"
-        if abs_val >= 0.70:
-            return f"Strong {sign}"
-        elif abs_val >= 0.30:
-            return f"Moderate {sign}"
-        else:
+        if abs_val < 0.10:
+            return "Negligible"
+        elif abs_val < 0.30:
             return "Weak"
+        elif abs_val < 0.50:
+            return "Moderate"
+        elif abs_val < 0.70:
+            return "Strong"
+        else:
+            return "Very Strong"
+
+    @staticmethod
+    def classify_practical_significance(coef: float) -> str:
+        if np.isnan(coef):
+            return "Undefined"
+        abs_val = abs(coef)
+        if abs_val < 0.10:
+            return "Negligible practical effect size"
+        elif abs_val < 0.30:
+            return "Weak practical effect size"
+        elif abs_val < 0.50:
+            return "Moderate practical effect size"
+        elif abs_val < 0.70:
+            return "Strong practical effect size"
+        else:
+            return "Very strong practical effect size"
 
     @classmethod
     def compute_univariate_metrics(cls, df: pd.DataFrame, numeric_cols: List[str]) -> List[UnivariateMetric]:
@@ -57,8 +76,33 @@ class StatisticalEngine:
             p90 = float(np.percentile(s, 90))
             iqr_val = float(p75 - p25)
 
-            skew_val = float(s.skew()) if cnt > 2 and std_val > 0 else 0.0
-            kurt_val = float(s.kurtosis()) if cnt > 3 and std_val > 0 else 0.0
+            skew_val = float(s.skew()) if cnt > 2 and std_val > 0 else None
+            kurt_val = float(s.kurtosis()) if cnt > 3 and std_val > 0 else None
+
+            # Distribution symmetry and plain English summary derived accurately
+            if skew_val is not None and not np.isnan(skew_val):
+                if skew_val > 0.5:
+                    distribution_symmetry = "Right-skewed (positive skew: extended upper tail with some higher values)"
+                    plain_summary = (
+                        f"Mean ({mean_val:,.2f}) exceeds Median ({median_val:,.2f}) due to a right-skewed tail. "
+                        f"The median represents typical values without outlier distortion."
+                    )
+                elif skew_val < -0.5:
+                    distribution_symmetry = "Left-skewed (negative skew: extended lower tail with some lower values)"
+                    plain_summary = (
+                        f"Mean ({mean_val:,.2f}) is below Median ({median_val:,.2f}) due to a left-skewed tail. "
+                        f"The median represents typical values without outlier distortion."
+                    )
+                else:
+                    distribution_symmetry = "Approximately symmetric (mean and median are closely aligned)"
+                    plain_summary = (
+                        f"The distribution of '{col}' is approximately symmetric (Mean = {mean_val:,.2f}, Median = {median_val:,.2f})."
+                    )
+            else:
+                distribution_symmetry = "Distribution symmetry cannot be determined from sample size alone"
+                plain_summary = (
+                    f"Mean is {mean_val:,.2f} and Median is {median_val:,.2f}. Skewness could not be reliably computed."
+                )
 
             metrics.append(
                 UnivariateMetric(
@@ -76,8 +120,10 @@ class StatisticalEngine:
                     p75=round(p75, 3),
                     p90=round(p90, 3),
                     iqr=round(iqr_val, 3),
-                    skewness=round(skew_val, 3) if not np.isnan(skew_val) else None,
-                    kurtosis=round(kurt_val, 3) if not np.isnan(kurt_val) else None
+                    skewness=round(skew_val, 3) if skew_val is not None and not np.isnan(skew_val) else None,
+                    kurtosis=round(kurt_val, 3) if kurt_val is not None and not np.isnan(kurt_val) else None,
+                    distribution_symmetry=distribution_symmetry,
+                    plain_english_summary=plain_summary
                 )
             )
         return metrics
@@ -118,7 +164,34 @@ class StatisticalEngine:
                 s_coef, s_pval = float("nan"), None
 
             strength = cls.classify_correlation_strength(p_coef)
+            practical_sig = cls.classify_practical_significance(p_coef)
             is_sig = bool(p_pval is not None and not np.isnan(p_pval) and p_pval < 0.05)
+            
+            direction = "Positive" if (not np.isnan(p_coef) and p_coef > 0) else ("Negative" if (not np.isnan(p_coef) and p_coef < 0) else "None")
+
+            # Formulate clear two-layer plain English interpretation
+            if np.isnan(p_coef):
+                plain_interp = f"Correlation between '{c1}' and '{c2}' is undefined due to constant or invalid values."
+            elif is_sig:
+                if abs(p_coef) < 0.30:
+                    plain_interp = (
+                        f"The analysis found a {strength.lower()} {direction.lower()} relationship between '{c1}' and '{c2}' (r = {p_coef:+.3f}). "
+                        f"Although statistically significant in this sample (p = {p_pval:.4f}), its small effect size means it should not "
+                        f"currently be treated as a strong predictive signal. Note: Correlation does not imply causation."
+                    )
+                else:
+                    plain_interp = (
+                        f"The analysis found a {strength.lower()} {direction.lower()} relationship between '{c1}' and '{c2}' (r = {p_coef:+.3f}), "
+                        f"which is statistically significant (p = {p_pval:.4f}) with a {practical_sig.lower()}. "
+                        f"Note: Correlation does not imply causation."
+                    )
+            else:
+                p_str = f"p = {p_pval:.4f}" if p_pval is not None else "p unavailable"
+                plain_interp = (
+                    f"The correlation between '{c1}' and '{c2}' is {strength.lower()} (r = {p_coef:+.3f}) and not statistically "
+                    f"significant at the 0.05 level ({p_str}). There is no reliable linear association in this sample. "
+                    f"Note: Correlation does not imply causation."
+                )
 
             results.append(
                 CorrelationPairResult(
@@ -128,8 +201,11 @@ class StatisticalEngine:
                     pearson_pvalue=round(float(p_pval), 4) if p_pval is not None and not np.isnan(p_pval) else None,
                     spearman_coef=round(float(s_coef), 3) if not np.isnan(s_coef) else 0.0,
                     spearman_pvalue=round(float(s_pval), 4) if s_pval is not None and not np.isnan(s_pval) else None,
+                    direction=direction,
                     strength=strength,
-                    is_statistically_significant=is_sig
+                    practical_significance=practical_sig,
+                    is_statistically_significant=is_sig,
+                    plain_english_interpretation=plain_interp
                 )
             )
         return results

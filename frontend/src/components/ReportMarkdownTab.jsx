@@ -6,9 +6,7 @@ import {
   Copy,
   Check,
   Loader2,
-  AlertTriangle,
-  FileCheck2,
-  Sparkles
+  AlertTriangle
 } from 'lucide-react';
 
 export default function ReportMarkdownTab({ report, datasetId }) {
@@ -132,6 +130,49 @@ export default function ReportMarkdownTab({ report, datasetId }) {
         <div className="p-4 rounded-2xl bg-red-50 border border-red-200 text-red-700 text-xs flex items-center space-x-2.5 shadow-sm">
           <AlertTriangle className="w-4 h-4 flex-shrink-0" />
           <span className="font-semibold">{downloadError}</span>
+        </div>
+      )}
+
+      {/* Optional Data Quality Score Breakdown Card */}
+      {report.data_quality_breakdown && report.data_quality_breakdown.length > 0 && (
+        <div className="glass-card p-6 md:p-8 rounded-3xl shadow-glass border border-[#CEAB93]/50 space-y-4">
+          <div className="flex items-center justify-between">
+            <h4 className="text-base font-extrabold text-[#3E2723] font-display flex items-center gap-2">
+              <FileText className="w-4 h-4 text-[#AD8B73]" />
+              Data Cleanliness & Quality Score Audit Breakdown
+            </h4>
+            <span className="text-xs px-3 py-1 rounded-full bg-[#AD8B73]/15 text-[#3E2723] font-mono font-bold border border-[#CEAB93]/60">
+              Score: {report.quality?.quality_score}/100 (Grade {report.quality?.grade})
+            </span>
+          </div>
+          <div className="overflow-x-auto rounded-2xl border border-[#CEAB93]/40 bg-white/70">
+            <table className="w-full text-xs text-left">
+              <thead className="bg-[#AD8B73]/15 text-[#3E2723] uppercase text-[10px] font-bold border-b border-[#CEAB93]/40">
+                <tr>
+                  <th className="px-4 py-3">Audit Check</th>
+                  <th className="px-4 py-3">Observed Result</th>
+                  <th className="px-4 py-3">Hygiene Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#CEAB93]/30 text-[#3E2723]">
+                {report.data_quality_breakdown.map((row, rIdx) => (
+                  <tr key={rIdx} className="hover:bg-white/90 transition-colors">
+                    <td className="px-4 py-2.5 font-semibold">{row.check}</td>
+                    <td className="px-4 py-2.5 font-mono text-[11px]">{row.result}</td>
+                    <td className="px-4 py-2.5">
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                        row.status.includes('Clean') || row.status.includes('Standardized') || row.status.includes('None')
+                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                          : 'bg-amber-50 text-amber-800 border border-amber-200'
+                      }`}>
+                        {row.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 

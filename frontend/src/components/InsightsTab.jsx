@@ -7,11 +7,11 @@ import {
   AlertCircle,
   PieChart,
   Sparkles,
-  ArrowUpRight,
   Zap,
   Target,
   FileCheck2,
-  BookOpen
+  BookOpen,
+  HelpCircle
 } from 'lucide-react';
 
 export default function InsightsTab({ report }) {
@@ -105,6 +105,17 @@ export default function InsightsTab({ report }) {
                   </div>
                   {ins.finding}
                 </div>
+
+                {/* 1.5 What This Means (Plain-English) */}
+                {ins.what_this_means && (
+                  <div className="text-[11px] text-[#5C3D2E] bg-[#FDFBF7] p-2.5 rounded-xl border border-[#CEAB93]/30 leading-relaxed font-medium">
+                    <div className="flex items-center space-x-1.5 font-bold text-[#3E2723] mb-0.5 text-[10px]">
+                      <HelpCircle className="w-3 h-3 text-[#AD8B73]" />
+                      <span>What This Means (Plain English)</span>
+                    </div>
+                    {ins.what_this_means}
+                  </div>
+                )}
               </div>
 
               <div className="space-y-2.5 pt-2 border-t border-[#CEAB93]/30">
@@ -124,7 +135,7 @@ export default function InsightsTab({ report }) {
                   <div className="text-[11px] text-[#7D5A44] bg-[#E3CAA5]/20 p-2.5 rounded-2xl border border-[#CEAB93]/30 leading-relaxed font-medium">
                     <div className="flex items-center space-x-1.5 font-bold text-[#3E2723] mb-0.5 text-[10px] uppercase">
                       <BookOpen className="w-3 h-3 text-[#AD8B73]" />
-                      <span>Operational Interpretation</span>
+                      <span>Business Implication</span>
                     </div>
                     {ins.interpretation}
                   </div>
@@ -135,7 +146,7 @@ export default function InsightsTab({ report }) {
                   <div className="text-[11px] text-[#3E2723] bg-white/95 border border-[#AD8B73]/50 p-3 rounded-2xl leading-relaxed shadow-sm">
                     <div className="flex items-center space-x-1.5 font-bold text-[#AD8B73] mb-1">
                       <Zap className="w-3.5 h-3.5 text-[#AD8B73]" />
-                      <span>Actionable Recommendation</span>
+                      <span>Recommended Action</span>
                     </div>
                     {ins.implication || ins.recommendation}
                   </div>

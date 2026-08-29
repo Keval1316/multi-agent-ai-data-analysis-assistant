@@ -1,7 +1,5 @@
 import re
 from typing import Tuple, Set, Optional
-from backend.app.core.exceptions import SQLSecurityError
-from backend.app.core.logging import logger
 
 
 class SQLValidator:

@@ -3,13 +3,10 @@ import { motion } from 'framer-motion';
 import {
   Download,
   FileSpreadsheet,
-  FileText,
   CheckCircle2,
   Sparkles,
   ArrowRight,
   ShieldCheck,
-  Filter,
-  Layers,
   Database,
   RefreshCw,
   Info,
@@ -18,8 +15,8 @@ import {
   AlertTriangle,
   Search,
   Check,
-  SlidersHorizontal,
-  ChevronDown
+  Calendar,
+  Activity
 } from 'lucide-react';
 
 export default function CleanDataTab({ report }) {
@@ -43,6 +40,7 @@ export default function CleanDataTab({ report }) {
   const changeLog = cleaning.change_log || [];
   const beforeAfter = cleaning.before_after || {};
   const unresolvedIssues = cleaning.unresolved_issues || [];
+  const confidenceAnnotations = cleaning.confidence_annotations || [];
 
   const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
@@ -132,8 +130,16 @@ export default function CleanDataTab({ report }) {
         return <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-100 text-sky-900 border border-sky-300">Null Imputed</span>;
       case 'exact_duplicate_removal':
         return <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-900 border border-rose-300">Duplicate Purged</span>;
+      case 'near_duplicate_merge':
+        return <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-900 border border-indigo-300">Near-Dup Merged</span>;
       case 'placeholder_removal':
         return <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-orange-100 text-orange-900 border border-orange-300">Placeholder Stripped</span>;
+      case 'date_normalization':
+        return <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-teal-100 text-teal-900 border border-teal-300">Date Standardized</span>;
+      case 'encoding_cleanup':
+        return <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-violet-100 text-violet-900 border border-violet-300">Encoding Fixed</span>;
+      case 'numeric_formatting_cleanup':
+        return <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-lime-100 text-lime-900 border border-lime-300">Numeric Cleaned</span>;
       default:
         return <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-gray-100 text-gray-800 border border-gray-300">{rule}</span>;
     }
@@ -152,13 +158,13 @@ export default function CleanDataTab({ report }) {
           <div className="space-y-2">
             <div className="inline-flex items-center space-x-2 px-3.5 py-1.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
               <ShieldCheck className="w-4 h-4 text-emerald-600" />
-              <span>Pristine Production-Ready Dataset • Validated 100%</span>
+              <span>Pristine Production-Ready Dataset • Validated 100% (12 Mandatory Passes)</span>
             </div>
             <h3 className="text-2xl md:text-3xl font-extrabold text-[#3E2723] tracking-tight font-display">
               Export Cleaned Dataset & Audit Trail
             </h3>
             <p className="text-xs md:text-sm text-[#7D5A44] max-w-2xl leading-relaxed">
-              The deterministic AI cleaning engine has enforced numeric range constraints, normalized categorical casing and whitespace, derived missing values from logical cross-field relationships, and reconciled contradictions.
+              The deterministic AI cleaning engine has enforced numeric range constraints, normalized categorical casing, collapsed synonyms/typos, unified date formats, derived missing values, and validated integrity.
             </p>
           </div>
 
@@ -258,7 +264,20 @@ export default function CleanDataTab({ report }) {
         </div>
       )}
 
-      {/* 3. Sub-Navigation Tabs: Preview Table vs. Granular Change Log vs. Before/After */}
+      {/* Confidence Annotations / Assumptions Banner if any */}
+      {confidenceAnnotations.length > 0 && (
+        <div className="p-4 rounded-2xl bg-blue-50 border border-blue-300 flex items-start space-x-3 text-blue-900 text-xs">
+          <Info className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+          <div className="space-y-1">
+            <div className="font-bold">Assumption Transparency Notice ({confidenceAnnotations.length} item(s))</div>
+            <p className="text-blue-800">
+              Transformations based on heuristic assumptions (such as date format context or statistical imputation) are marked for transparency in the change log.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* 3. Sub-Navigation Tabs */}
       <div className="flex items-center space-x-2 border-b border-[#CEAB93]/40 pb-2">
         <button
           onClick={() => setActiveSubTab('preview')}
@@ -300,7 +319,6 @@ export default function CleanDataTab({ report }) {
       {/* Sub-Tab 1: Clean Data Preview Table */}
       {activeSubTab === 'preview' && (
         <div className="space-y-6">
-          {/* Live Interactive Clean Data Table Preview */}
           <div className="glass-card p-6 md:p-8 rounded-3xl space-y-4 shadow-glass border border-[#CEAB93]/50">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-2.5">
@@ -364,7 +382,7 @@ export default function CleanDataTab({ report }) {
                 <Sparkles className="w-5 h-5 text-[#AD8B73]" />
               </div>
               <h4 className="font-extrabold text-[#3E2723] text-sm md:text-base tracking-tight font-display">
-                Data Cleansing Transformations & Rules Applied
+                Data Cleansing Transformations & Mandatory Rules Applied
               </h4>
             </div>
 
@@ -424,7 +442,10 @@ export default function CleanDataTab({ report }) {
                 <option value="cross_field_reconciliation">Cross-Field Reconciliation</option>
                 <option value="null_imputation">Null Imputation</option>
                 <option value="exact_duplicate_removal">Duplicate Removal</option>
+                <option value="near_duplicate_merge">Near-Duplicate Merge</option>
                 <option value="placeholder_removal">Placeholder Removal</option>
+                <option value="date_normalization">Date Standardization</option>
+                <option value="encoding_cleanup">Encoding Cleanse</option>
               </select>
             </div>
           </div>
@@ -439,7 +460,7 @@ export default function CleanDataTab({ report }) {
                     <th className="py-3 px-3">Rule Applied</th>
                     <th className="py-3 px-3">Original Raw Value</th>
                     <th className="py-3 px-3">Cleaned Value</th>
-                    <th className="py-3 px-3">Confidence</th>
+                    <th className="py-3 px-3 text-center">Confidence</th>
                     <th className="py-3 px-3">Details / Reason</th>
                   </tr>
                 </thead>
@@ -466,8 +487,14 @@ export default function CleanDataTab({ report }) {
                           : '<null>'}
                       </td>
                       <td className="py-2.5 px-3 text-center">
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
-                          {Math.round((entry.confidence || 1.0) * 100)}%
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                          (entry.confidence || 1.0) >= 0.9
+                            ? 'bg-emerald-100 text-emerald-800'
+                            : (entry.confidence || 1.0) >= 0.7
+                            ? 'bg-amber-100 text-amber-800'
+                            : 'bg-rose-100 text-rose-800'
+                        }`}>
+                          {Math.round((entry.confidence || 1.0) * 100)}% ({entry.confidence_level || 'HIGH'})
                         </span>
                       </td>
                       <td className="py-2.5 px-3 text-[#7D5A44] font-sans text-[11px] max-w-xs truncate" title={entry.description}>
@@ -498,7 +525,7 @@ export default function CleanDataTab({ report }) {
               </h4>
             </div>
             <p className="text-xs text-[#7D5A44]">
-              Quantified comparison proving zero lingering defects in missingness, range violations, and categorical consistency.
+              Quantified comparison proving zero lingering defects in missingness, range violations, categorical consistency, and date normalization.
             </p>
           </div>
 
@@ -558,18 +585,77 @@ export default function CleanDataTab({ report }) {
             </div>
           </div>
 
+          {/* Distinct Categories & Synonym Collapse */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Categorical Distinct Counts Before vs After */}
+            {Object.keys(beforeAfter.distinct_categories_before || {}).length > 0 && (
+              <div className="p-5 rounded-2xl bg-white/90 border border-[#CEAB93]/40 space-y-3 shadow-xs">
+                <h5 className="font-bold text-xs uppercase tracking-wider text-[#3E2723]">
+                  Distinct Categorical Labels (Before vs. After)
+                </h5>
+                <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                  {Object.keys(beforeAfter.distinct_categories_before).map((col, idx) => {
+                    const bCount = beforeAfter.distinct_categories_before[col] || 0;
+                    const aCount = beforeAfter.distinct_categories_after?.[col] || bCount;
+                    return (
+                      <div key={`${col}-${idx}`} className="flex items-center justify-between text-xs py-1 border-b border-[#CEAB93]/20">
+                        <span className="font-mono font-semibold text-[#3E2723]">{col}</span>
+                        <div className="flex items-center space-x-3 font-mono text-[11px]">
+                          <span className={bCount > aCount ? 'text-amber-700 font-bold' : 'text-[#7D5A44]'}>
+                            Before: {bCount} distinct
+                          </span>
+                          <ArrowRight className="w-3.5 h-3.5 text-[#AD8B73]" />
+                          <span className="text-emerald-700 font-black">
+                            After: {aCount} canonical
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Date Formats Detected & Normalized */}
+            {Object.keys(beforeAfter.date_formats_detected || {}).length > 0 && (
+              <div className="p-5 rounded-2xl bg-white/90 border border-[#CEAB93]/40 space-y-3 shadow-xs">
+                <div className="flex items-center space-x-2">
+                  <Calendar className="w-4 h-4 text-[#AD8B73]" />
+                  <h5 className="font-bold text-xs uppercase tracking-wider text-[#3E2723]">
+                    Date Format Normalization (Single ISO 8601)
+                  </h5>
+                </div>
+                <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                  {Object.entries(beforeAfter.date_formats_detected).map(([col, formats], idx) => (
+                    <div key={`${col}-${idx}`} className="p-3 rounded-xl bg-[#FFFBE9]/60 border border-[#CEAB93]/30 space-y-1">
+                      <div className="flex items-center justify-between text-xs font-mono font-bold text-[#3E2723]">
+                        <span>{col}</span>
+                        <span className="text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-300">
+                          {beforeAfter.date_formats_applied?.[col] || 'YYYY-MM-DD'}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-[#7D5A44]">
+                        Detected {formats.length} format(s): {formats.join(', ')} → Normalized to uniform ISO 8601.
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Categorical Collapse Mapping */}
           {Object.keys(beforeAfter.categorical_mappings || {}).length > 0 && (
             <div className="p-5 rounded-2xl bg-white/90 border border-[#CEAB93]/40 space-y-3 shadow-xs">
               <h5 className="font-bold text-xs uppercase tracking-wider text-[#3E2723]">
-                Categorical Variants Collapsed to Canonical Labels
+                Categorical Variants & Synonyms Collapsed to Canonical Labels
               </h5>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {Object.entries(beforeAfter.categorical_mappings).map(([col, mapping], idx) => (
                   <div key={`${col}-${idx}`} className="p-3 rounded-xl bg-[#FFFBE9]/60 border border-[#CEAB93]/30 space-y-2">
                     <span className="font-mono text-xs font-bold text-[#3E2723] block">{col}</span>
                     <div className="space-y-1 text-[11px] font-mono">
-                      {Object.entries(mapping).slice(0, 6).map(([raw, canon], mIdx) => (
+                      {Object.entries(mapping).slice(0, 8).map(([raw, canon], mIdx) => (
                         <div key={mIdx} className="flex items-center justify-between text-[#7D5A44]">
                           <span className="text-rose-700 line-through truncate max-w-[120px]">"{raw}"</span>
                           <ArrowRight className="w-3 h-3 text-[#AD8B73]" />
@@ -577,6 +663,38 @@ export default function CleanDataTab({ report }) {
                         </div>
                       ))}
                     </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Outliers Flagged */}
+          {beforeAfter.outliers_flagged && beforeAfter.outliers_flagged.length > 0 && (
+            <div className="p-5 rounded-2xl bg-white/90 border border-[#CEAB93]/40 space-y-3 shadow-xs">
+              <div className="flex items-center space-x-2">
+                <Activity className="w-4 h-4 text-amber-600" />
+                <h5 className="font-bold text-xs uppercase tracking-wider text-[#3E2723]">
+                  Statistical Outliers Flagged (Non-Destructive Audit)
+                </h5>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {beforeAfter.outliers_flagged.map((out, idx) => (
+                  <div key={idx} className="p-3.5 rounded-xl bg-amber-50/70 border border-amber-200 space-y-1.5 text-xs text-amber-950">
+                    <div className="flex items-center justify-between font-mono font-bold">
+                      <span>Column: {out.column}</span>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] bg-amber-200/80 text-amber-900">
+                        {out.outlier_count} extreme values ({out.method})
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-amber-900 leading-relaxed">
+                      {out.reasoning}
+                    </p>
+                    {out.sample_values && out.sample_values.length > 0 && (
+                      <div className="text-[10px] font-mono text-amber-800">
+                        Sample values: {out.sample_values.join(', ')}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

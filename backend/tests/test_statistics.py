@@ -37,9 +37,10 @@ def test_correlations_computation(clean_data):
 
     assert len(corrs) == 2
     for c in corrs:
-        assert -1.0 <= c.pearson_coef <= 1.0
-        assert -1.0 <= c.spearman_coef <= 1.0
-        assert c.strength in ["Strong Positive", "Moderate Positive", "Weak", "Moderate Negative", "Strong Negative"]
+        assert c.strength in ["Very Strong", "Strong", "Moderate", "Weak", "Negligible"]
+        assert c.direction in ["Positive", "Negative", "None"]
+        assert c.practical_significance is not None
+        assert c.plain_english_interpretation is not None
 
 
 def test_groupby_and_anova_computation(clean_data):

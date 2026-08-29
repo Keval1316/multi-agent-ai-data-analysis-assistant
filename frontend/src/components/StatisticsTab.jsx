@@ -5,9 +5,6 @@ import {
   GitCommit,
   Database,
   CheckCircle2,
-  Clock,
-  Code,
-  Terminal,
   Activity
 } from 'lucide-react';
 
