@@ -43,7 +43,6 @@ services:
     name: datapilot-frontend
     runtime: static
     rootDir: frontend
-    plan: free
     buildCommand: npm install && npm run build
     staticPublishPath: dist
     routes:
