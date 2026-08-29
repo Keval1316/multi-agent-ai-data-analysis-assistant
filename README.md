@@ -10,7 +10,7 @@
 [![Vite](https://img.shields.io/badge/Vite-5.1-646CFF?style=for-the-badge&logo=vite&logoColor=white)](https://vitejs.dev/)
 [![Plotly](https://img.shields.io/badge/Plotly.js-Interactive%20Charts-3F4F75?style=for-the-badge&logo=plotly&logoColor=white)](https://plotly.com/)
 [![TailwindCSS](https://img.shields.io/badge/Tailwind_CSS-3.4-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
-[![Tests](https://img.shields.io/badge/Tests-54%20Passing%20(100%25)-brightgreen?style=for-the-badge&logo=pytest&logoColor=white)](https://docs.pytest.org/)
+[![Tests](https://img.shields.io/badge/Tests-75%20Passing%20(100%25)-brightgreen?style=for-the-badge&logo=pytest&logoColor=white)](https://docs.pytest.org/)
 [![License](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)](LICENSE)
 
 <p align="center">
@@ -536,7 +536,7 @@ pytest tests/ -v
 - **Export Engines**: ReportLab multi-page PDF generation, Cleaned CSV, and Styled Excel exports.
 
 ```
-============================== 54 passed in 5.88s ==============================
+============================== 75 passed (100% pass rate) ==============================
 ```
 
 To verify the frontend production build:
