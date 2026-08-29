@@ -17,7 +17,8 @@ import {
   CheckCircle2,
   History as HistoryIcon,
   Square,
-  Info
+  Info,
+  ArrowRight
 } from 'lucide-react';
 import PipelineTracker from './components/PipelineTracker';
 import OverviewTab from './components/OverviewTab';
@@ -319,10 +320,12 @@ ORD-2010,Hank Green,electronics,Mouse,2,25.00,0,50.00,2025-01-10,False,West`;
     }
   };
 
-  const handleClearHistory = () => {
+  const handleClearHistory = async () => {
     setHistory([]);
     try {
       localStorage.removeItem('data_analysis_history');
+      const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+      await fetch(`${apiBase}/api/dataset/history/all`, { method: 'DELETE' });
     } catch {}
   };
 

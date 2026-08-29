@@ -22,16 +22,26 @@ async def clear_all_analysis_history():
     """Deletes all analysis reports, cached dataframes, and cleans up all caches."""
     logger.info("Received request to clear all analysis history")
     ReportBuilder.clear_all_caches()
+    try:
+        from backend.app.api.routes.profile import _profile_cache, _quality_cache
+        _profile_cache.clear()
+        _quality_cache.clear()
+    except Exception:
+        pass
     return {"success": True, "message": "All analysis history cleared successfully."}
 
 
 @router.delete("/{dataset_id}")
 async def delete_analysis_record(dataset_id: str):
-    """Deletes an analysis report and cleans up resources for a dataset."""
+    """Deletes an analysis report and cleans up resources for a dataset idempotently."""
     logger.info(f"Received request to delete analysis for '{dataset_id}'")
-    deleted = ReportBuilder.delete_report(dataset_id)
-    if not deleted:
-        raise HTTPException(status_code=404, detail=f"Dataset '{dataset_id}' not found in active session.")
+    ReportBuilder.delete_report(dataset_id)
+    try:
+        from backend.app.api.routes.profile import _profile_cache, _quality_cache
+        _profile_cache.pop(dataset_id, None)
+        _quality_cache.pop(dataset_id, None)
+    except Exception:
+        pass
     return {"success": True, "message": f"Dataset '{dataset_id}' deleted successfully."}
 
 
@@ -47,16 +57,26 @@ async def get_analysis_report(dataset_id: str):
 
     # 2. Check if registered in DuckDB to build on-demand
     tbl = duckdb_manager.generate_table_name(dataset_id)
-    if not duckdb_manager.table_exists(tbl):
-        raise HTTPException(status_code=404, detail=f"Dataset '{dataset_id}' not found in active session.")
+    if duckdb_manager.table_exists(tbl):
+        try:
+            df = duckdb_manager.get_dataframe(tbl)
+            report = ReportBuilder.build_report_from_dataset(df, dataset_id, tbl, f"{dataset_id}.csv")
+            return report
+        except Exception as e:
+            logger.error(f"Error compiling report for '{dataset_id}': {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Failed to generate analysis report: {str(e)}")
 
-    try:
-        df = duckdb_manager.get_dataframe(tbl)
-        report = ReportBuilder.build_report_from_dataset(df, dataset_id, tbl, f"{dataset_id}.csv")
-        return report
-    except Exception as e:
-        logger.error(f"Error compiling report for '{dataset_id}': {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to generate analysis report: {str(e)}")
+    # 3. Check if cleaned dataframe is cached
+    cleaned_df = ReportBuilder.get_cleaned_df(dataset_id)
+    if cleaned_df is not None:
+        try:
+            report = ReportBuilder.build_report_from_dataset(cleaned_df, dataset_id, tbl, f"{dataset_id}.csv")
+            return report
+        except Exception as e:
+            logger.error(f"Error compiling report for '{dataset_id}' from cleaned cache: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Failed to generate analysis report: {str(e)}")
+
+    raise HTTPException(status_code=404, detail=f"Dataset '{dataset_id}' not found in active session.")
 
 
 @router.post("/report/pdf")
@@ -120,6 +140,7 @@ async def download_pdf_report(dataset_id: str):
 
 def _resolve_cleaned_dataframe(dataset_id: str):
     """Retrieves or creates and caches the cleaned DataFrame for a dataset."""
+    import os
     from backend.app.services.cleaning.cleaner import DataCleaner
 
     cleaned_df = ReportBuilder.get_cleaned_df(dataset_id)
@@ -129,13 +150,36 @@ def _resolve_cleaned_dataframe(dataset_id: str):
 
     if cleaned_df is None:
         tbl = duckdb_manager.generate_table_name(dataset_id)
-        if not duckdb_manager.table_exists(tbl):
-            raise HTTPException(status_code=404, detail=f"Dataset '{dataset_id}' not found.")
-        df = duckdb_manager.get_dataframe(tbl)
-        cleaned_df, cleaning_summary = DataCleaner.clean_dataset(df, dataset_id, filename)
-        ReportBuilder.cache_cleaned_df(dataset_id, cleaned_df)
-        if report:
-            report.cleaning_summary = cleaning_summary.model_dump()
+        if duckdb_manager.table_exists(tbl):
+            df = duckdb_manager.get_dataframe(tbl)
+            cleaned_df, cleaning_summary = DataCleaner.clean_dataset(df, dataset_id, filename)
+            ReportBuilder.cache_cleaned_df(dataset_id, cleaned_df)
+            if report:
+                report.cleaning_summary = cleaning_summary.model_dump()
+        else:
+            # Check temp upload directory
+            from backend.app.api.routes.upload import TEMP_UPLOAD_DIR
+            from backend.app.services.ingestion.loader import DatasetLoader
+            found_df = None
+            if os.path.exists(TEMP_UPLOAD_DIR):
+                for f in os.listdir(TEMP_UPLOAD_DIR):
+                    if f.startswith(f"{dataset_id}_"):
+                        fpath = os.path.join(TEMP_UPLOAD_DIR, f)
+                        ext = os.path.splitext(fpath)[1].lower()
+                        try:
+                            with open(fpath, "rb") as rf:
+                                found_df, _ = DatasetLoader.load_and_sanitize(rf.read(), ext)
+                        except Exception:
+                            pass
+                        break
+            if found_df is not None:
+                cleaned_df, cleaning_summary = DataCleaner.clean_dataset(found_df, dataset_id, filename)
+                ReportBuilder.cache_cleaned_df(dataset_id, cleaned_df)
+                duckdb_manager.register_dataframe(cleaned_df, dataset_id, tbl)
+                if report:
+                    report.cleaning_summary = cleaning_summary.model_dump()
+            else:
+                raise HTTPException(status_code=404, detail=f"Dataset '{dataset_id}' not found.")
 
     return cleaned_df, report, clean_base
 

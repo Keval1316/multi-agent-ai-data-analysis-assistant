@@ -55,6 +55,25 @@ def test_history_and_delete_endpoint(clean_dataset_registered):
     assert del_resp.status_code == 200
     assert del_resp.json()["success"] is True
 
+    # 4b. Test idempotent DELETE (calling again on deleted id should still return 200 OK)
+    del_resp_again = client.delete(f"/api/dataset/{dataset_id}")
+    assert del_resp_again.status_code == 200
+    assert del_resp_again.json()["success"] is True
+
     # 5. Verify history is empty again
     resp2 = client.get("/api/dataset/history")
     assert len(resp2.json()["history"]) == 0
+
+
+def test_clear_all_history_endpoint(clean_dataset_registered):
+    df, dataset_id, table_name = clean_dataset_registered
+    ReportBuilder.build_report_from_dataset(df, dataset_id, table_name, "clean_dataset.csv")
+
+    # Clear all
+    clear_resp = client.delete("/api/dataset/history/all")
+    assert clear_resp.status_code == 200
+    assert clear_resp.json()["success"] is True
+
+    # Verify history is empty
+    resp = client.get("/api/dataset/history")
+    assert len(resp.json()["history"]) == 0
