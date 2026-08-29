@@ -24,7 +24,10 @@ import {
   Check,
   Activity,
   Download,
-  FileSpreadsheet
+  FileSpreadsheet,
+  ShieldAlert,
+  Terminal,
+  Zap
 } from 'lucide-react';
 
 export default function OverviewTab({ report }) {

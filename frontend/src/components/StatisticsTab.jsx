@@ -5,7 +5,8 @@ import {
   GitCommit,
   Database,
   CheckCircle2,
-  Activity
+  Activity,
+  Clock
 } from 'lucide-react';
 
 export default function StatisticsTab({ report }) {

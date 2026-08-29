@@ -14,7 +14,7 @@ export default function VisualizationsTab({ report }) {
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
-      className="space-y-8 max-w-5xl mx-auto"
+      className="space-y-8 w-full"
     >
       {/* Header Banner */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-6 rounded-3xl bg-white border border-[#CEAB93]/50 shadow-glass">

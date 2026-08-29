@@ -30,6 +30,7 @@ import ReportMarkdownTab from './components/ReportMarkdownTab';
 import HistorySidebar from './components/HistorySidebar';
 import CleanDataTab from './components/CleanDataTab';
 import SnowfallBackground from './components/SnowfallBackground';
+import ErrorBoundary from './components/ErrorBoundary';
 
 export default function App() {
   const [stage, setStage] = useState('upload'); // 'upload' | 'streaming' | 'dashboard'
@@ -54,9 +55,10 @@ export default function App() {
   });
   const [isStopping, setIsStopping] = useState(false);
 
-  // Cancellation and Stream refs
+  // Cancellation, Stream and DOM refs
   const abortControllerRef = useRef(null);
   const streamReaderRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   // Persist history to localStorage
   useEffect(() => {
@@ -330,6 +332,31 @@ ORD-2010,Hank Green,electronics,Mouse,2,25.00,0,50.00,2025-01-10,False,West`;
   };
 
   const handleReset = () => {
+    // 1. Abort any active streaming connection or SSE reader
+    if (abortControllerRef.current) {
+      try {
+        abortControllerRef.current.abort();
+      } catch (err) {
+        console.warn('Error aborting controller:', err);
+      }
+      abortControllerRef.current = null;
+    }
+    if (streamReaderRef.current) {
+      try {
+        streamReaderRef.current.cancel();
+      } catch (err) {
+        console.warn('Error cancelling stream reader:', err);
+      }
+      streamReaderRef.current = null;
+    }
+
+    // 2. Reset DOM file input element
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+
+    // 3. Reset application states to initial upload stage
+    setIsStopping(false);
     setStage('upload');
     setSelectedFile(null);
     setCurrentStep(null);
@@ -339,6 +366,10 @@ ORD-2010,Hank Green,electronics,Mouse,2,25.00,0,50.00,2025-01-10,False,West`;
     setErrorMsg(null);
     setStatusNotice(null);
     setActiveTab('overview');
+    setIsSidebarOpen(false);
+
+    // 4. Smooth scroll back to top of the upload view
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   return (
@@ -366,14 +397,23 @@ ORD-2010,Hank Green,electronics,Mouse,2,25.00,0,50.00,2025-01-10,False,West`;
       {/* 1. Header Navigation */}
       <header className="sticky top-0 z-40 bg-white/85 backdrop-blur-xl border-b border-[#CEAB93]/40 shadow-sm transition-all">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
-          {/* Left: Brand Identity */}
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 md:w-11 md:h-11 rounded-2xl bg-gradient-to-br from-[#AD8B73] to-[#3E2723] text-white flex items-center justify-center shadow-md shadow-[#AD8B73]/20 ring-2 ring-white/80">
+          {/* Left: Brand Identity / Main Home Page Link */}
+          <a
+            href="/"
+            onClick={(e) => {
+              e.preventDefault();
+              handleReset();
+            }}
+            className="flex items-center space-x-3 cursor-pointer group select-none no-underline text-inherit"
+            title="Return to Main Home Page"
+            aria-label="DataPilot Home"
+          >
+            <div className="w-10 h-10 md:w-11 md:h-11 rounded-2xl bg-gradient-to-br from-[#AD8B73] to-[#3E2723] text-white flex items-center justify-center shadow-md shadow-[#AD8B73]/20 ring-2 ring-white/80 group-hover:scale-105 group-hover:shadow-lg transition-all duration-200">
               <Bot className="w-5 h-5 md:w-6 md:h-6" />
             </div>
             <div>
               <div className="flex items-center space-x-2">
-                <span className="font-extrabold text-base md:text-lg tracking-tight text-[#3E2723] font-display">
+                <span className="font-extrabold text-base md:text-lg tracking-tight text-[#3E2723] font-display group-hover:text-[#AD8B73] transition-colors">
                   DataPilot:Multi-Agent Data Analyst
                 </span>
                 <span className="hidden sm:inline px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-[#AD8B73]/15 text-[#3E2723] border border-[#CEAB93]/50">
@@ -384,10 +424,10 @@ ORD-2010,Hank Green,electronics,Mouse,2,25.00,0,50.00,2025-01-10,False,West`;
                 Autonomous CSV & Excel Insight Synthesizer
               </span>
             </div>
-          </div>
+          </a>
 
           {/* Right: History, New Analysis & Status */}
-          <div className="flex items-center space-x-2.5">
+          <div className="flex items-center space-x-2 sm:space-x-3">
             <button
               onClick={() => setIsSidebarOpen(true)}
               className="p-2 sm:px-3.5 sm:py-2 rounded-2xl bg-white/90 border border-[#CEAB93]/60 text-[#3E2723] hover:border-[#AD8B73] hover:bg-[#FFFBE9] transition-all shadow-xs flex items-center space-x-2 cursor-pointer group"
@@ -402,15 +442,19 @@ ORD-2010,Hank Green,electronics,Mouse,2,25.00,0,50.00,2025-01-10,False,West`;
               )}
             </button>
 
-            {stage === 'dashboard' && (
-              <button
-                onClick={handleReset}
-                className="flex items-center space-x-2 px-3.5 py-2 rounded-2xl bg-white/90 border border-[#CEAB93]/60 text-xs font-bold text-[#3E2723] hover:bg-[#FFFBE9] hover:border-[#AD8B73] transition-all shadow-sm cursor-pointer"
-              >
-                <RotateCcw className="w-3.5 h-3.5 text-[#AD8B73]" />
-                <span className="hidden sm:inline">New Analysis</span>
-              </button>
-            )}
+            {/* New Analysis Button - Always visible and redirects to main data upload */}
+            <button
+              onClick={handleReset}
+              className={`flex items-center space-x-2 px-3 sm:px-3.5 py-2 rounded-2xl border text-xs font-bold transition-all shadow-xs cursor-pointer group ${
+                stage !== 'upload'
+                  ? 'bg-gradient-to-r from-[#AD8B73] to-[#3E2723] text-white border-transparent hover:from-[#3E2723] hover:to-[#2C1810] shadow-md hover:shadow-lg hover:scale-[1.02]'
+                  : 'bg-white/90 border-[#CEAB93]/60 text-[#3E2723] hover:bg-[#FFFBE9] hover:border-[#AD8B73]'
+              }`}
+              title="Start New Analysis (Return to Data Upload)"
+            >
+              <RotateCcw className={`w-3.5 h-3.5 transition-transform duration-300 group-hover:-rotate-90 ${stage !== 'upload' ? 'text-white' : 'text-[#AD8B73]'}`} />
+              <span className="inline">New Analysis</span>
+            </button>
 
             <div className="hidden sm:flex items-center space-x-1.5 px-3 py-1.5 rounded-full bg-[#AD8B73]/10 border border-[#CEAB93]/50 text-[#3E2723] text-xs font-mono font-semibold">
               <span className="w-2 h-2 rounded-full bg-[#AD8B73] animate-pulse" />
@@ -521,6 +565,7 @@ ORD-2010,Hank Green,electronics,Mouse,2,25.00,0,50.00,2025-01-10,False,West`;
               {/* Drag and Drop Zone */}
               <div className="glass-card p-8 md:p-10 rounded-3xl border-2 border-dashed border-[#CEAB93]/70 hover:border-[#AD8B73] transition-all text-center space-y-5 shadow-glass group">
                 <input
+                  ref={fileInputRef}
                   type="file"
                   id="file-input"
                   accept=".csv,.xlsx,.xls"
@@ -551,7 +596,7 @@ ORD-2010,Hank Green,electronics,Mouse,2,25.00,0,50.00,2025-01-10,False,West`;
                   <motion.div
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
-                    className="pt-2"
+                    className="pt-2 space-y-2.5"
                   >
                     <button
                       onClick={handleStartAnalysis}
@@ -560,6 +605,17 @@ ORD-2010,Hank Green,electronics,Mouse,2,25.00,0,50.00,2025-01-10,False,West`;
                       <Sparkles className="w-5 h-5 animate-pulse" />
                       <span>Launch Agents Pipeline</span>
                       <ArrowRight className="w-4 h-4 ml-1" />
+                    </button>
+
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedFile(null);
+                        if (fileInputRef.current) fileInputRef.current.value = '';
+                      }}
+                      className="text-xs font-semibold text-[#7D5A44] hover:text-[#3E2723] hover:underline cursor-pointer"
+                    >
+                      Clear selected file
                     </button>
                   </motion.div>
                 )}
@@ -680,18 +736,20 @@ ORD-2010,Hank Green,electronics,Mouse,2,25.00,0,50.00,2025-01-10,False,West`;
                 })}
               </div>
 
-              {/* Tab Contents */}
-              <div>
-                {activeTab === 'overview' && <OverviewTab report={finalReport} />}
-                {activeTab === 'cleandata' && <CleanDataTab report={finalReport} />}
-                {activeTab === 'quality' && <DataQualityTab report={finalReport} />}
-                {activeTab === 'statistics' && <StatisticsTab report={finalReport} />}
-                {activeTab === 'visualizations' && <VisualizationsTab report={finalReport} />}
-                {activeTab === 'insights' && <InsightsTab report={finalReport} />}
-                {activeTab === 'report' && (
-                  <ReportMarkdownTab report={finalReport} datasetId={finalReport.dataset_id} />
-                )}
-              </div>
+              {/* Tab Contents Wrapped in ErrorBoundary */}
+              <ErrorBoundary key={activeTab}>
+                <div>
+                  {activeTab === 'overview' && <OverviewTab report={finalReport} />}
+                  {activeTab === 'cleandata' && <CleanDataTab report={finalReport} />}
+                  {activeTab === 'quality' && <DataQualityTab report={finalReport} />}
+                  {activeTab === 'statistics' && <StatisticsTab report={finalReport} />}
+                  {activeTab === 'visualizations' && <VisualizationsTab report={finalReport} />}
+                  {activeTab === 'insights' && <InsightsTab report={finalReport} />}
+                  {activeTab === 'report' && (
+                    <ReportMarkdownTab report={finalReport} datasetId={finalReport.dataset_id} />
+                  )}
+                </div>
+              </ErrorBoundary>
             </motion.div>
           )}
         </AnimatePresence>
