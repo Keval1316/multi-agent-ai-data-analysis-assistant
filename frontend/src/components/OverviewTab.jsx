@@ -29,6 +29,7 @@ import {
   Terminal,
   Zap
 } from 'lucide-react';
+import { getApiBaseUrl } from '../services/apiConfig';
 
 export default function OverviewTab({ report }) {
   const [expandedStep, setExpandedStep] = useState(null);
@@ -40,7 +41,7 @@ export default function OverviewTab({ report }) {
 
   const datasetId = report.dataset_id;
   const { understanding, profile, quality, statistics, sql_results, patterns, charts, insights, cleaning_summary } = report;
-  const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+  const apiBase = getApiBaseUrl();
 
   // Derive questions directly answered by empirical analysis and discovered patterns
   const answeredQuestionsList = (insights?.insights || []).map((ins, idx) => {

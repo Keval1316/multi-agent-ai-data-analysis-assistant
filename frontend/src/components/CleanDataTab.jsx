@@ -18,6 +18,7 @@ import {
   Calendar,
   Activity
 } from 'lucide-react';
+import { getApiBaseUrl } from '../services/apiConfig';
 
 export default function CleanDataTab({ report }) {
   const [previewData, setPreviewData] = useState(null);
@@ -42,7 +43,7 @@ export default function CleanDataTab({ report }) {
   const unresolvedIssues = cleaning.unresolved_issues || [];
   const confidenceAnnotations = cleaning.confidence_annotations || [];
 
-  const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+  const apiBase = getApiBaseUrl();
 
   useEffect(() => {
     if (!datasetId) return;

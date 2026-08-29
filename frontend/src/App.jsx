@@ -18,7 +18,15 @@ import {
   History as HistoryIcon,
   Square,
   Info,
-  ArrowRight
+  ArrowRight,
+  Server,
+  Settings,
+  Check,
+  ExternalLink,
+  X,
+  RefreshCw,
+  Wifi,
+  WifiOff
 } from 'lucide-react';
 import PipelineTracker from './components/PipelineTracker';
 import OverviewTab from './components/OverviewTab';
@@ -31,6 +39,7 @@ import HistorySidebar from './components/HistorySidebar';
 import CleanDataTab from './components/CleanDataTab';
 import SnowfallBackground from './components/SnowfallBackground';
 import ErrorBoundary from './components/ErrorBoundary';
+import { getApiBaseUrl, setCustomApiBaseUrl } from './services/apiConfig';
 
 export default function App() {
   const [stage, setStage] = useState('upload'); // 'upload' | 'streaming' | 'dashboard'
@@ -55,6 +64,12 @@ export default function App() {
   });
   const [isStopping, setIsStopping] = useState(false);
 
+  // API Server Connection Modal State
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [customApiUrlInput, setCustomApiUrlInput] = useState(() => getApiBaseUrl());
+  const [testStatus, setTestStatus] = useState(null); // null | 'testing' | 'success' | 'error'
+  const [testMessage, setTestMessage] = useState('');
+
   // Cancellation, Stream and DOM refs
   const abortControllerRef = useRef(null);
   const streamReaderRef = useRef(null);
@@ -73,7 +88,7 @@ export default function App() {
   useEffect(() => {
     const fetchBackendHistory = async () => {
       try {
-        const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+        const apiBase = getApiBaseUrl();
         const res = await fetch(`${apiBase}/api/dataset/history`);
         if (res.ok) {
           const data = await res.json();
@@ -95,6 +110,39 @@ export default function App() {
     };
     fetchBackendHistory();
   }, []);
+
+  const handleTestConnection = async (urlToTest) => {
+    setTestStatus('testing');
+    setTestMessage('Pinging server health endpoint...');
+    try {
+      const target = (urlToTest || customApiUrlInput || '').trim().replace(/\/+$/, '');
+      const res = await fetch(`${target}/api/health`);
+      if (res.ok) {
+        const data = await res.json();
+        setTestStatus('success');
+        setTestMessage(`Connected successfully! Server is ${data.status || 'healthy'}.`);
+      } else {
+        setTestStatus('error');
+        setTestMessage(`Server responded with status ${res.status}: ${res.statusText}`);
+      }
+    } catch (err) {
+      setTestStatus('error');
+      setTestMessage(`Connection failed (${err.message}). If your backend is on Render free tier, it may take ~30-50s to wake up from idle.`);
+    }
+  };
+
+  const handleSaveApiUrl = () => {
+    setCustomApiBaseUrl(customApiUrlInput);
+    setIsSettingsOpen(false);
+    setStatusNotice(`Backend API URL updated to: ${getApiBaseUrl()}`);
+  };
+
+  const handleResetApiUrl = () => {
+    setCustomApiBaseUrl('');
+    const resolved = getApiBaseUrl();
+    setCustomApiUrlInput(resolved);
+    setStatusNotice('Backend API URL reset to default configuration.');
+  };
 
   const handleSelectSample = async (sampleName) => {
     setErrorMsg(null);
@@ -161,7 +209,7 @@ ORD-2010,Hank Green,electronics,Mouse,2,25.00,0,50.00,2025-01-10,False,West`;
     // Setup AbortController for termination support
     abortControllerRef.current = new AbortController();
 
-    const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+    const apiBase = getApiBaseUrl();
     const formData = new FormData();
     formData.append('file', selectedFile);
 
@@ -178,78 +226,91 @@ ORD-2010,Hank Green,electronics,Mouse,2,25.00,0,50.00,2025-01-10,False,West`;
 
       const reader = response.body.getReader();
       streamReaderRef.current = reader;
-      const decoder = new TextDecoder();
+      const decoder = new TextDecoder('utf-8');
       let buffer = '';
 
       while (true) {
-        const { value, done } = await reader.read();
+        const { done, value } = await reader.read();
         if (done) break;
 
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split('\n\n');
-        buffer = lines.pop();
+        buffer = lines.pop(); // keep last incomplete chunk in buffer
 
-        for (const line of lines) {
-          if (!line.trim()) continue;
+        for (const block of lines) {
+          if (!block.trim()) continue;
 
-          const eventMatch = line.match(/^event:\s*(\w+)/m);
-          const dataMatch = line.match(/^data:\s*(.+)$/m);
+          let eventType = 'message';
+          let rawData = '';
 
-          if (eventMatch && dataMatch) {
-            const eventType = eventMatch[1];
-            try {
-              // Sanitize non-standard JSON tokens like NaN, Infinity, -Infinity
-              const sanitizedJson = dataMatch[1]
-                .replace(/:\s*NaN\b/g, ': null')
-                .replace(/:\s*Infinity\b/g, ': null')
-                .replace(/:\s*-Infinity\b/g, ': null');
-              const data = JSON.parse(sanitizedJson);
-
-              if (eventType === 'step_complete') {
-                setCurrentStep(data.step);
-                setCompletedSteps((prev) => [...new Set([...prev, data.step])]);
-                if (data.preview) {
-                  setLivePreviews((prev) => ({ ...prev, [data.step]: data.preview }));
-                }
-              } else if (eventType === 'complete') {
-                if (data.report) {
-                  setFinalReport(data.report);
-                  setStage('dashboard');
-                  setActiveTab('overview');
-
-                  // Save to persistent history
-                  const historyRecord = {
-                    dataset_id: data.report.dataset_id,
-                    filename: data.report.filename || selectedFile?.name || 'dataset.csv',
-                    title: data.report.title,
-                    subtitle: data.report.subtitle,
-                    generated_at: data.report.generated_at || new Date().toISOString(),
-                    quality_score: data.report.quality?.quality_score || 100,
-                    grade: data.report.quality?.grade || 'A',
-                    total_rows: data.report.profile?.total_rows || 0,
-                    total_columns: data.report.profile?.total_columns || 0,
-                    domain: data.report.understanding?.domain || 'General Data',
-                    charts_count: data.report.charts?.charts?.length || 0,
-                    insights_count: data.report.insights?.insights?.length || 0,
-                    report: data.report
-                  };
-                  setHistory((prev) => [historyRecord, ...prev.filter((h) => h.dataset_id !== data.report.dataset_id)]);
-                }
-              } else if (eventType === 'error') {
-                setErrorMsg(data.error || 'Pipeline encountered an error.');
-              }
-            } catch (err) {
-              console.error('Error parsing SSE event data:', err);
+          const eventLines = block.split('\n');
+          for (const line of eventLines) {
+            if (line.startsWith('event:')) {
+              eventType = line.replace('event:', '').trim();
+            } else if (line.startsWith('data:')) {
+              rawData = line.replace('data:', '').trim();
             }
+          }
+
+          if (!rawData) continue;
+
+          try {
+            const eventPayload = JSON.parse(rawData);
+
+            // Handle event types
+            if (eventType === 'step_start') {
+              setCurrentStep(eventPayload.step);
+            } else if (eventType === 'step_complete') {
+              setCompletedSteps((prev) => Array.from(new Set([...prev, eventPayload.step])));
+              if (eventPayload.preview) {
+                setLivePreviews((prev) => ({
+                  ...prev,
+                  [eventPayload.step]: eventPayload.preview
+                }));
+              }
+            } else if (eventType === 'pipeline_complete') {
+              const fullReport = eventPayload.report;
+              setFinalReport(fullReport);
+              setStage('dashboard');
+              setActiveTab('overview');
+
+              // Save dataset to analysis history
+              if (fullReport && fullReport.dataset_id) {
+                const historyItem = {
+                  dataset_id: fullReport.dataset_id,
+                  filename: fullReport.dataset_info?.filename || selectedFile.name,
+                  file_size: fullReport.dataset_info?.file_size || selectedFile.size,
+                  row_count: fullReport.profile?.total_rows || 0,
+                  column_count: fullReport.profile?.total_columns || 0,
+                  created_at: new Date().toISOString(),
+                  report: fullReport
+                };
+                setHistory((prev) => {
+                  const filtered = prev.filter((h) => h.dataset_id !== fullReport.dataset_id);
+                  return [historyItem, ...filtered];
+                });
+              }
+            } else if (eventType === 'pipeline_error') {
+              setErrorMsg(eventPayload.error || 'A critical error occurred during pipeline analysis.');
+              setStage('upload');
+            }
+          } catch (parseErr) {
+            console.warn('Failed to parse SSE line JSON:', parseErr, rawData);
           }
         }
       }
     } catch (err) {
       if (err.name === 'AbortError') {
-        console.log('Analysis fetch aborted cleanly by user.');
+        setStatusNotice('Analysis stream was cancelled by user.');
       } else {
         console.error('Streaming connection error:', err);
-        setErrorMsg(err.message || 'Connection to analysis engine failed.');
+        const isLocalhostMisconfig = apiBase.includes('localhost') && typeof window !== 'undefined' && !window.location.hostname.includes('localhost');
+        if (isLocalhostMisconfig) {
+          setErrorMsg(`Unable to connect to backend at "${apiBase}". Your frontend is deployed on the web, but is attempting to connect to localhost. Click "Server Settings" in the header to set your Render backend URL.`);
+          setIsSettingsOpen(true);
+        } else {
+          setErrorMsg(`${err.message || 'Connection failed'} (Backend: ${apiBase}). Note: On Render free tier, inactive services take 30–50 seconds to wake up.`);
+        }
       }
     } finally {
       abortControllerRef.current = null;
@@ -291,7 +352,7 @@ ORD-2010,Hank Green,electronics,Mouse,2,25.00,0,50.00,2025-01-10,False,West`;
     }
 
     try {
-      const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+      const apiBase = getApiBaseUrl();
       const res = await fetch(`${apiBase}/api/dataset/${item.dataset_id}/report`);
       if (!res.ok) {
         throw new Error(`Failed to retrieve dataset report (${res.status})`);
@@ -315,7 +376,7 @@ ORD-2010,Hank Green,electronics,Mouse,2,25.00,0,50.00,2025-01-10,False,West`;
       handleReset();
     }
     try {
-      const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+      const apiBase = getApiBaseUrl();
       await fetch(`${apiBase}/api/dataset/${dataset_id}`, { method: 'DELETE' });
     } catch {
       // Backend deletion best effort
@@ -326,7 +387,7 @@ ORD-2010,Hank Green,electronics,Mouse,2,25.00,0,50.00,2025-01-10,False,West`;
     setHistory([]);
     try {
       localStorage.removeItem('data_analysis_history');
-      const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+      const apiBase = getApiBaseUrl();
       await fetch(`${apiBase}/api/dataset/history/all`, { method: 'DELETE' });
     } catch {}
   };
@@ -426,8 +487,23 @@ ORD-2010,Hank Green,electronics,Mouse,2,25.00,0,50.00,2025-01-10,False,West`;
             </div>
           </a>
 
-          {/* Right: History, New Analysis & Status */}
+          {/* Right: History, Server Settings, New Analysis & Status */}
           <div className="flex items-center space-x-2 sm:space-x-3">
+            {/* Server Settings Button */}
+            <button
+              onClick={() => {
+                setCustomApiUrlInput(getApiBaseUrl());
+                setTestStatus(null);
+                setTestMessage('');
+                setIsSettingsOpen(true);
+              }}
+              className="p-2 sm:px-3 sm:py-2 rounded-2xl bg-white/90 border border-[#CEAB93]/60 text-[#3E2723] hover:border-[#AD8B73] hover:bg-[#FFFBE9] transition-all shadow-xs flex items-center space-x-1.5 cursor-pointer group"
+              title="Backend Server Connection Settings"
+            >
+              <Server className="w-3.5 h-3.5 text-[#AD8B73] group-hover:rotate-12 transition-transform" />
+              <span className="hidden md:inline text-xs font-bold font-sans">Server</span>
+            </button>
+
             <button
               onClick={() => setIsSidebarOpen(true)}
               className="p-2 sm:px-3.5 sm:py-2 rounded-2xl bg-white/90 border border-[#CEAB93]/60 text-[#3E2723] hover:border-[#AD8B73] hover:bg-[#FFFBE9] transition-all shadow-xs flex items-center space-x-2 cursor-pointer group"
@@ -456,7 +532,7 @@ ORD-2010,Hank Green,electronics,Mouse,2,25.00,0,50.00,2025-01-10,False,West`;
               <span className="inline">New Analysis</span>
             </button>
 
-            <div className="hidden sm:flex items-center space-x-1.5 px-3 py-1.5 rounded-full bg-[#AD8B73]/10 border border-[#CEAB93]/50 text-[#3E2723] text-xs font-mono font-semibold">
+            <div className="hidden lg:flex items-center space-x-1.5 px-3 py-1.5 rounded-full bg-[#AD8B73]/10 border border-[#CEAB93]/50 text-[#3E2723] text-xs font-mono font-semibold">
               <span className="w-2 h-2 rounded-full bg-[#AD8B73] animate-pulse" />
               <span>17 agents active</span>
             </div>
@@ -754,6 +830,117 @@ ORD-2010,Hank Green,electronics,Mouse,2,25.00,0,50.00,2025-01-10,False,West`;
           )}
         </AnimatePresence>
       </main>
+
+      {/* Server Settings Modal */}
+      <AnimatePresence>
+        {isSettingsOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white rounded-3xl shadow-2xl border border-[#CEAB93]/60 p-6 md:p-8 max-w-lg w-full relative overflow-hidden"
+            >
+              <div className="flex items-center justify-between pb-4 border-b border-[#CEAB93]/30">
+                <div className="flex items-center space-x-3">
+                  <div className="w-10 h-10 rounded-2xl bg-[#AD8B73]/15 text-[#3E2723] flex items-center justify-center">
+                    <Server className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base md:text-lg font-bold text-[#3E2723]">Backend API Connection</h3>
+                    <p className="text-xs text-[#7D5A44]">Configure and test your backend server endpoint</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setIsSettingsOpen(false)}
+                  className="p-1.5 rounded-xl hover:bg-[#FFFBE9] text-[#7D5A44] transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="py-5 space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-[#3E2723] uppercase tracking-wider mb-2">
+                    Backend API URL
+                  </label>
+                  <input
+                    type="text"
+                    value={customApiUrlInput}
+                    onChange={(e) => setCustomApiUrlInput(e.target.value)}
+                    placeholder="https://datapilot-backend.onrender.com"
+                    className="w-full px-4 py-3 rounded-2xl border border-[#CEAB93]/70 focus:outline-hidden focus:ring-2 focus:ring-[#AD8B73] text-sm text-[#3E2723] font-mono bg-[#FFFBE9]/40"
+                  />
+                  <p className="text-[11px] text-[#7D5A44] mt-1.5">
+                    Example: <code className="text-[#3E2723] font-bold">https://datapilot-backend.onrender.com</code> or <code className="text-[#3E2723] font-bold">http://localhost:8000</code>
+                  </p>
+                </div>
+
+                {/* Test Connection Button & Result */}
+                <div className="pt-1">
+                  <button
+                    type="button"
+                    onClick={() => handleTestConnection(customApiUrlInput)}
+                    disabled={testStatus === 'testing'}
+                    className="w-full py-2.5 px-4 rounded-xl border border-[#CEAB93] bg-[#FFFBE9] hover:bg-[#F3E99F]/50 text-xs font-bold text-[#3E2723] flex items-center justify-center space-x-2 transition-all cursor-pointer"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 text-[#AD8B73] ${testStatus === 'testing' ? 'animate-spin' : ''}`} />
+                    <span>{testStatus === 'testing' ? 'Testing Connection...' : 'Test Server Connectivity'}</span>
+                  </button>
+
+                  {testStatus && (
+                    <div
+                      className={`mt-3 p-3 rounded-xl text-xs font-medium flex items-start space-x-2 ${
+                        testStatus === 'success'
+                          ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                          : testStatus === 'error'
+                          ? 'bg-rose-50 text-rose-800 border border-rose-200'
+                          : 'bg-amber-50 text-amber-800 border border-amber-200'
+                      }`}
+                    >
+                      {testStatus === 'success' ? (
+                        <Check className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                      ) : testStatus === 'error' ? (
+                        <WifiOff className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                      ) : (
+                        <Wifi className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                      )}
+                      <span>{testMessage}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Modal Actions */}
+              <div className="pt-4 border-t border-[#CEAB93]/30 flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={handleResetApiUrl}
+                  className="text-xs font-semibold text-[#7D5A44] hover:text-[#3E2723] underline cursor-pointer"
+                >
+                  Reset to Default
+                </button>
+                <div className="flex items-center space-x-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsSettingsOpen(false)}
+                    className="px-4 py-2 rounded-xl border border-[#CEAB93]/60 text-xs font-bold text-[#3E2723] hover:bg-[#FFFBE9] cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSaveApiUrl}
+                    className="px-5 py-2 rounded-xl bg-gradient-to-r from-[#AD8B73] to-[#3E2723] text-white text-xs font-bold shadow-md hover:shadow-lg cursor-pointer"
+                  >
+                    Save & Apply
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Footer */}
       <footer className="border-t border-[#CEAB93]/40 bg-white/60 backdrop-blur-md py-6 text-center text-xs text-[#7D5A44] font-mono">

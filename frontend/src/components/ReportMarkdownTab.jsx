@@ -8,6 +8,7 @@ import {
   Loader2,
   AlertTriangle
 } from 'lucide-react';
+import { getApiBaseUrl } from '../services/apiConfig';
 
 export default function ReportMarkdownTab({ report, datasetId }) {
   const [downloading, setDownloading] = useState(false);
@@ -20,7 +21,7 @@ export default function ReportMarkdownTab({ report, datasetId }) {
     setDownloading(true);
     setDownloadError(null);
     try {
-      const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+      const apiBase = getApiBaseUrl();
       const targetId = datasetId || report?.dataset_id || 'export';
       let res = await fetch(`${apiBase}/api/dataset/${targetId}/report/pdf`);
 
