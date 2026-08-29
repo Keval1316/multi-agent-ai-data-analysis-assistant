@@ -40,6 +40,8 @@ class Settings(BaseSettings):
     def parse_cors_origins(cls, v: Union[List[str], str]) -> List[str]:
         if isinstance(v, str):
             v_stripped = v.strip()
+            if v_stripped == "*":
+                return ["*"]
             if v_stripped.startswith("[") and v_stripped.endswith("]"):
                 try:
                     return json.loads(v_stripped)
